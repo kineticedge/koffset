@@ -1,0 +1,39 @@
+FROM eclipse-temurin:25-jdk-ubi10-minimal AS build
+
+RUN microdnf install -y curl tar gzip unzip net-tools dnsutils jq && microdnf clean all
+
+
+#FROM eclipse-temurin:25-jdk-ubi10-minimal AS build
+#
+#RUN microdnf install -y curl tar gzip unzip net-tools dnsutils iproute2 iputils-ping jq && \
+#    microdnf clean all
+
+
+#FROM eclipse-temurin:25-jdk-jammy AS build
+#
+#RUN \
+#    apt-get update && \
+#    apt-get install -y curl
+
+#FROM eclipse-temurin:25-jdk-jammy
+#eclipse-temurin:25-jre-ubi-minimal
+#eclipse-temurin:25-jdk-ubi-minimal
+
+#RUN \
+#    apt-get update && \
+#    apt-get install -y curl net-tools dnsutils iproute2 iputils-ping jq && \
+#    apt-get remove -y wget && \
+#    mkdir -p /app
+
+ENV \
+    ENVIRONMENT="" \
+    JAVA_OPTS="-XX:+UseG1GC --enable-native-access=ALL-UNNAMED"
+
+# for development, pull in the artifact from your local machine
+COPY ./docker/entrypoint.sh /
+COPY ./build/distributions/koffset-exporter-1.0.tar /app.tar
+
+EXPOSE 8080/tcp
+
+ENTRYPOINT  ["/entrypoint.sh"]
+CMD         []

@@ -1,0 +1,75 @@
+[
+  {
+    "name": "org.apache.kafka.common.security.oauthbearer.DefaultJwtRetriever",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.apache.kafka.common.security.oauthbearer.DefaultJwtValidator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.apache.kafka.common.security.oauthbearer.JwtClaimsSet",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.apache.kafka.common.security.oauthbearer.JwtToken",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.apache.kafka.common.security.oauthbearer.JwtValidator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.apache.kafka.common.security.oauthbearer.OAuthBearerSaslClient",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.apache.kafka.common.security.oauthbearer.OAuthBearerSaslClientFactory",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.apache.kafka.common.security.oauthbearer.OAuthBearerToken",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.apache.kafka.common.security.oauthbearer.OAuthBearerTokenCallback",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.apache.kafka.common.security.oauthbearer.OAuthBearerValidatorCallback",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.apache.kafka.common.security.oauthbearer.OAuthBearerExtensions",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.apache.kafka.common.security.oauthbearer.OAuthBearerExtensionsCallback",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.apache.kafka.common.security.oauthbearer.internals.OAuthBearerSaslClientCallbackHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.apache.kafka.common.security.oauthbearer.internals.OAuthBearerValidatorCallbackHandler",
+    "allDeclaredConstructors": true
+  },
+
+  {
+    "name": "org.apache.kafka.common.metrics.JmxReporter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.apache.kafka.common.metrics.JmxReporter$1",
+    "allDeclaredConstructors": true
+  }
+]

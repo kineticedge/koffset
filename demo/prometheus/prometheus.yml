@@ -1,0 +1,33 @@
+global:
+  scrape_interval: 2s
+
+scrape_configs:
+  - job_name: kafka
+    scrape_interval: 30s
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+        - broker-1:7071
+        labels:
+          cluster_type: "kafka"
+          job: "kafka-core"
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '(.*):(.*)'
+        target_label: instance
+        replacement: '$1'
+  - job_name: koffset
+    scrape_interval: 5s
+    metrics_path: /metrics
+    params:
+      primary: ["true"]
+    static_configs:
+      - targets:
+        - koffset:8899
+        labels:
+          job: "koffset-kafka-core"
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '(.*):(.*)'
+        target_label: instance
+        replacement: '$1'

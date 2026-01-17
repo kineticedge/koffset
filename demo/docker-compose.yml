@@ -1,0 +1,117 @@
+networks:
+  default:
+    name: koffset
+
+volumes:
+  bk1: {}
+  bk1_secrets: {}
+  prometheus: {}
+  grafana: {}
+
+services:
+
+  broker-1:
+    image: ${IMAGE}:${VERSION}
+    container_name: ${COMPOSE_PROJECT_NAME}-broker-1
+    hostname: broker-1
+    stop_grace_period: 120s
+    healthcheck:
+      test: nc -z localhost 9092 || exit 1
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    ports:
+      - '19092:19092'
+      - '9092:19092' # port 9092 can be used for broker discovery, but 19092 will be actually port used for kafka protocol
+    volumes:
+      - bk1:/var/lib/kafka/data
+      - bk1_secrets:/etc/kafka/secrets
+      - ./jmx_prometheus:/opt/jmx_prometheus
+    environment:
+      CLUSTER_ID: "0000000000000000000000"
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENERS: PLAINTEXT://:9092,PLAINTEXT_HOST://:19092,CONTROLLER://:9093
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_SECURITY_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker-1:9092,PLAINTEXT_HOST://localhost:19092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@broker-1:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      KAFKA_NUM_PARTITIONS: 4
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 500
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_OPTS: -javaagent:/opt/jmx_prometheus/jmx_prometheus_javaagent.jar=7071:/opt/jmx_prometheus/kafka-config.yml
+
+  prometheus:
+    image: prom/prometheus:v3.8.1
+    container_name: ${COMPOSE_PROJECT_NAME}-prometheus
+    hostname: prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:9090/"]
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    privileged: true
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-admin-api"
+      - "--web.enable-lifecycle"
+      - "--web.enable-remote-write-receiver"
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus:/prometheus
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana:12.3.1
+    container_name: ${COMPOSE_PROJECT_NAME}-grafana
+    hostname: grafana
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "--tries=1", "http://localhost:3000/api/health" ]
+      start_period: 10s
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: grafana
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_DEFAULT_APP_MODE: development
+    volumes:
+      - grafana:/var/lib/grafana
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini
+      - ./grafana/prometheus.yml:/etc/grafana/provisioning/datasources/prometheus.yml
+      - ./grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+
+  koffset:
+    #image: koffset-exporter:latest
+    image: koffset-exporter-native:latest
+    container_name: ${COMPOSE_PROJECT_NAME}-koffset
+    hostname: koffset
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8899/readyz" ]
+      start_period: 10s
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      broker-1:
+        condition: service_healthy
+    ports:
+      - "8899:8899"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: broker-1:9092
+
