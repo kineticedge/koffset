@@ -43,11 +43,7 @@ public class Environment {
     }
 
     public String get(String name) {
-        final String val = getEnv(name);
-        if (isBlank(val)) {
-            throw new IllegalArgumentException("Missing required environment variable: " + name);
-        }
-        return val;
+        return getEnv(name);
     }
 
     public long getAsLong(String name, long defaultValue) {

@@ -1,3 +1,7 @@
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+
 plugins {
     id("java")
     id("application")
@@ -20,6 +24,7 @@ val slf4j_version: String by project
 val netty_version: String by project
 
 val testcontainer_version: String by project
+val mockito_version: String by project
 val junit_version: String by project
 val junit_platform_version: String by project
 
@@ -36,6 +41,8 @@ dependencies {
 
     testImplementation("org.testcontainers:testcontainers:$testcontainer_version")
     testImplementation("org.testcontainers:testcontainers-kafka:$testcontainer_version")
+    testImplementation("org.mockito:mockito-core:${mockito_version}")
+    testImplementation("org.mockito:mockito-junit-jupiter:${mockito_version}")
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junit_version")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:$junit_version")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:${junit_platform_version}")
@@ -57,6 +64,44 @@ val dockerDevBuild by tasks.registering(Exec::class) {
 
 application {
     mainClass.set("io.kineticedge.koffset.Main")
+}
+
+val generateVersionProperties by tasks.registering {
+    val propertiesFile = layout.buildDirectory.file("generated/version.properties")
+    outputs.file(propertiesFile)
+
+    doLast {
+        val cmdSha = "git rev-parse --short HEAD"
+        val cmdTag = "git describe --tags --exact-match"
+        val cmdBranch = "git rev-parse --abbrev-ref HEAD"
+
+        fun run(cmd: String): String = try {
+            Runtime.getRuntime().exec(cmd).inputStream.bufferedReader().readText().trim()
+        } catch (e: Exception) {
+            "unknown"
+        }
+
+        val sha = run(cmdSha)
+        var ref = run(cmdTag)
+        if (ref == "unknown" || ref.isEmpty()) {
+            ref = run(cmdBranch)
+        }
+
+        val buildTime = OffsetDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+
+        propertiesFile.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText("""
+                build.time=$buildTime
+                build.sha=$sha
+                build.ref=$ref
+            """.trimIndent())
+        }
+    }
+}
+
+tasks.processResources {
+    from(generateVersionProperties)
 }
 
 //val dockerTagPrev by tasks.registering(Exec::class) {

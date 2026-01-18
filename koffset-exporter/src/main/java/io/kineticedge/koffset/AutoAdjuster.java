@@ -18,9 +18,6 @@ public class AutoAdjuster {
 
     private boolean logged;
 
-    //TODO is this config.getCadenceTolerance() ???
-    private long minimalRefreshMs = 50L;
-
     public AutoAdjuster(final AutoAdjustConfig config, final LagAnalyzer lagAnalyzer) {
         this.config = config;
         this.lagAnalyzer = lagAnalyzer;
@@ -47,10 +44,18 @@ public class AutoAdjuster {
 
         long targetInterval = detectedIntervalMs;
 
-        if (detectedIntervalMs < minimalRefreshMs) {
-            long multiplier = (long) Math.ceil((double) minimalRefreshMs / detectedIntervalMs);
+//        if (detectedIntervalMs < minimalRefreshMs) {
+//            long multiplier = (long) Math.ceil((double) minimalRefreshMs / detectedIntervalMs);
+//            targetInterval = detectedIntervalMs * multiplier;
+//        }
+
+        if (detectedIntervalMs < config.getMinRefreshMs()) {
+            long multiplier = (long) Math.ceil((double) config.getMinRefreshMs() / detectedIntervalMs);
             targetInterval = detectedIntervalMs * multiplier;
+            log.debug("Detected interval {}ms is below minimum {}ms. Using multiplier x{} to set target to {}ms",
+                    detectedIntervalMs, config.getMinRefreshMs(), multiplier, targetInterval);
         }
+
 
         // --- FRESHNESS TOLERANCE CHECK ---
         // We want our data to be "fresh". If the time since our last refresh (dataAge)

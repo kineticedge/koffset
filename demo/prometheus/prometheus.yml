@@ -23,9 +23,23 @@ scrape_configs:
       primary: ["true"]
     static_configs:
       - targets:
-        - koffset:8899
+        - koffset:8080
         labels:
           job: "koffset-kafka-core"
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '(.*):(.*)'
+        target_label: instance
+        replacement: '$1'
+  - job_name: kle
+    scrape_interval: 5s
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - kle:8000
+        labels:
+          job: "koffset-kafka-core"
+          namespace: "foo"
     relabel_configs:
       - source_labels: [__address__]
         regex: '(.*):(.*)'

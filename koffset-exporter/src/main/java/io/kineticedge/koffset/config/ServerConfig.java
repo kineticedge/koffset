@@ -5,7 +5,7 @@ import io.kineticedge.koffset.Server;
 public class ServerConfig {
 
     //TODO 8080 ?
-    private int port = 8899;
+    private int port = 8080;
 
     //
 

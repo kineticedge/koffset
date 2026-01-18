@@ -31,6 +31,7 @@ services:
     environment:
       CLUSTER_ID: "0000000000000000000000"
       KAFKA_NODE_ID: 1
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
       KAFKA_LISTENERS: PLAINTEXT://:9092,PLAINTEXT_HOST://:19092,CONTROLLER://:9093
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_SECURITY_INTER_BROKER_LISTENER_NAME: PLAINTEXT
@@ -97,12 +98,12 @@ services:
       - ./grafana/dashboards:/var/lib/grafana/dashboards
 
   koffset:
-    #image: koffset-exporter:latest
-    image: koffset-exporter-native:latest
+    image: koffset-exporter-dev:latest
+    #image: koffset-exporter-native:latest
     container_name: ${COMPOSE_PROJECT_NAME}-koffset
     hostname: koffset
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8899/readyz" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/readyz" ]
       start_period: 10s
       interval: 5s
       timeout: 5s
@@ -111,7 +112,23 @@ services:
       broker-1:
         condition: service_healthy
     ports:
-      - "8899:8899"
+      - "8080:8080"
     environment:
-      KAFKA_BOOTSTRAP_SERVERS: broker-1:9092
+      KOFFSET_KAFKA_BOOTSTRAP_SERVERS: broker-1:9092
 
+  kle:
+    platform: linux/amd64
+    #image: koffset-exporter:latest
+    image: seglo/kafka-lag-exporter:latest
+    container_name: ${COMPOSE_PROJECT_NAME}-kle
+    hostname: kle
+    depends_on:
+      broker-1:
+        condition: service_healthy
+    volumes: 
+      - ./application.conf:/opt/docker/conf/application.conf
+    ports:
+      - "8000:8000"
+    environment:
+      KAFKA_LAG_EXPORTER_CLUSTERS.0.name: default
+      KAFKA_LAG_EXPORTER_CLUSTERS.0.bootstrap-brokers: broker-1:9092

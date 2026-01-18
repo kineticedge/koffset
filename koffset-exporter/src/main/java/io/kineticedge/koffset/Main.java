@@ -1,7 +1,9 @@
 package io.kineticedge.koffset;
 
 import io.kineticedge.koffset.config.KoffsetConfig;
+import io.kineticedge.koffset.util.ConfigLoader;
 import io.kineticedge.koffset.util.KafkaEnv;
+import io.kineticedge.koffset.util.VersionInfo;
 import org.apache.kafka.clients.admin.Admin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,13 +16,13 @@ public class Main {
 
     static void main(String[] args) {
 
-        final KoffsetConfig koffsetConfig = new KoffsetConfig();
+        final ConfigLoader loader = new ConfigLoader();
+        final KoffsetConfig koffsetConfig = loader.parse(KoffsetConfig.class, "KOFFSET");
 
-        KafkaEnv env = new KafkaEnv();
+        VersionInfo.banner(koffsetConfig);
+        VersionInfo.log();
 
-        Map<String, Object> config = env.to("KAFKA_");
-
-        final Admin admin = Admin.create(config);
+        final Admin admin = Admin.create(koffsetConfig.getKafka());
         final LagAnalyzer lagAnalyzer = new LagAnalyzer(koffsetConfig.getCollector(), admin);
         final AutoAdjuster autoAdjuster = new AutoAdjuster(koffsetConfig.getAutoAdjust(), lagAnalyzer);
 
@@ -29,7 +31,6 @@ public class Main {
         final Server server = new Server(koffsetConfig.getServer(), lagAnalyzer, autoAdjuster);
         server.start();
 
-        System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>> 1111");
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             log.info("Shutting down...");
             server.stop();

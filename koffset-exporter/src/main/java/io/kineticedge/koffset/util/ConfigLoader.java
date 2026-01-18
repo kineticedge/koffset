@@ -175,9 +175,12 @@ public class ConfigLoader {
 
             f.setAccessible(true);
 
-            System.out.println(f.getType());
-
             final String environment = getEnvironmentVariable(f.getName(), prefix);
+            final String propertyName = getPropertyKey(f.getName(), prefix);
+
+//            System.out.println(f.getType());
+//            System.out.println("env " + environment);
+//            System.out.println("pr  " + propertyName);
 
             if (f.getType().getName().startsWith("io.kineticedge.koffset.config")) {
                 try {
@@ -186,7 +189,6 @@ public class ConfigLoader {
                         subobject = create(f.getType());
                         f.set(object, subobject);
                     }
-
                     populateByEnvironment(subobject, f.getType(), environment + "_");
                 } catch (IllegalAccessException e) {
                     throw new RuntimeException(e);
@@ -208,13 +210,20 @@ public class ConfigLoader {
                 String pp = environment + "_";
 
                 f.setAccessible(true);
-                final String p = environment + "_";
+               // final String p = environment + "_";
                 final List<String> overrides = env.getAll().keySet().stream().filter(e -> e.startsWith(pp)).toList();
+
+                System.out.println(overrides);
                 if (!overrides.isEmpty()) {
                     final Map<String, Object> map = getMap(object, f);
                     overrides.forEach(e -> {
-                        final String key = e.substring(prefix.length()).replaceAll("(?<!_)_(?!_)", ".").replaceAll("__", "_").toLowerCase();
+                        final String key = e.substring(pp.length()).replaceAll("(?<!_)_(?!_)", ".").replaceAll("__", "_").toLowerCase();
                         //String key = e.substring(prefix.length()).toLowerCase().replace("_", ".");
+
+                        System.out.println("env " + e);
+                        System.out.println("PR " + getPropertyKey(e, ""));
+//                        System.out.println("e : " + e);
+//                        System.out.println("KEY : " + key);
                         map.put(key, env.get(e));
                     });
                 }
@@ -265,6 +274,10 @@ public class ConfigLoader {
     //
     private static String getEnvironmentVariable(final String string, final String prefix) {
         return prefix + PATTERN.matcher(string).replaceAll(match -> "_" + match.group()).toUpperCase();
+    }
+
+    private static String getPropertyKey(final String string, final String prefix) {
+        return prefix.replace("_", ".").toLowerCase() + PATTERN.matcher(string).replaceAll(match -> "." + match.group()).toLowerCase();
     }
 
     @SuppressWarnings("unchecked")

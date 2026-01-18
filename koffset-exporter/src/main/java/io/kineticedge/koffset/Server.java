@@ -259,7 +259,7 @@ public class Server {
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
                         Map.Entry::getValue,
-                        (existing, replacement) -> existing, //, // They are identical, so just keep the first
+                        (existing, _) -> existing,
                         () -> new TreeMap<>(Comparator.comparing(TopicPartition::topic).thenComparing(TopicPartition::partition))
                 ))
                 .forEach((tp, detail) -> {
@@ -283,6 +283,30 @@ public class Server {
 
                 writeLong(buffer, "koffset_group_lag", labels, detail.offsetLag());
                 writeSeconds(buffer, "koffset_group_lag_seconds", labels, detail.partitionHeadTimestamp() - detail.groupOffsetInterpolatedTimestamp());
+
+//                long stalenessMs = 0;
+//                if (detail.offsetLag() > 0 && detail.groupOffsetFirstObservedTimestamp() > 0) {
+//                    stalenessMs = System.currentTimeMillis() - detail.groupOffsetFirstObservedTimestamp();
+//                }
+//                writeSeconds(buffer, "koffset_group_offset_stale_seconds", labels, stalenessMs);
+
+                writeLong(buffer, "koffset_group_lag", labels, detail.offsetLag());
+                writeSeconds(buffer, "koffset_group_lag_seconds", labels, detail.partitionHeadTimestamp() - detail.groupOffsetInterpolatedTimestamp());
+
+                // SMART STALENESS:
+                // Measures how much "time" the consumer is behind the latest message in the log.
+                // If both producer and consumer stop, this value remains stationary (accurate).
+                // If the producer keeps moving but the consumer stops, this value increases (accurate).
+                long stalenessMs = 0;
+                if (detail.offsetLag() > 0) {
+                    long logicalStaleness = detail.partitionHeadTimestamp() - detail.groupOffsetInterpolatedTimestamp();
+                    // Grace period (2x refresh interval) to filter out natural commit latency.
+                    if (logicalStaleness > (lagAnalyzer.lastIntervalMs() * 2)) {
+                        stalenessMs = logicalStaleness;
+                    }
+                }
+                writeSeconds(buffer, "koffset_group_offset_stale_seconds", labels, stalenessMs);
+
 
                 writeLine(buffer, String.format("koffset_group_velocity_records_per_sec{%s} %.2f", labels, detail.groupVelocityRecordsPerSec()));
 

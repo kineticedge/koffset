@@ -28,7 +28,9 @@ WORKDIR /app
 COPY --from=build --chown=appuser:appgroup /home/gradle/src/koffset-exporter/docker/entrypoint.sh /entrypoint.sh
 COPY --from=build --chown=appuser:appgroup /home/gradle/src/koffset-exporter/build/distributions/koffset-exporter-*.tar /app.tar
 
-EXPOSE 8899
+RUN     mkdir /app
+
+EXPOSE 8080/tcp
 
 ENV JAVA_OPTS="-XX:+UseG1GC --enable-native-access=ALL-UNNAMED"
 

@@ -38,20 +38,24 @@ public class DataGenerator {
     }
 
     public void run() throws Exception {
-        int topicCount = 500; // Reduced for sanity in local testing, but scales easily
+        int topicCount = 5; // Reduced for sanity in local testing, but scales easily
 
         setupInfrastructure(topicCount);
 
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             // Start 20 Producers
-            IntStream.range(0, 10).forEach(i -> executor.submit(() -> startProducer(i, topicCount)));
+            IntStream.range(0, 1).forEach(i -> executor.submit(() -> startProducer(i, topicCount)));
             // Start 20 Consumers
-            IntStream.range(0, 30).forEach(i -> {
 
-                List<String> topics = IntStream.range(0, 4).mapToObj(j -> "demo-topic-" + random.nextInt(topicCount)).toList();
-
-                executor.submit(() -> startConsumer(i, topics));
+            IntStream.range(0, 5).forEach(i -> {
+                executor.submit(() -> startConsumer(i, List.of("demo-topic-" + i)));
             });
+
+
+            // easier to test with just 1 topic.
+//                List<String> topics = IntStream.range(0, 1).mapToObj(j -> "demo-topic-" + random.nextInt(topicCount)).toList();
+//                executor.submit(() -> startConsumer(i, topics));
+//
 
             log.info("Simulation running. 20 virtual producers and 20 virtual consumers active.");
             Thread.currentThread().join();

@@ -27,7 +27,7 @@ class AutoAdjustConfigTest {
 
         System.out.println("**");
         System.out.println(config.getAutoAdjust().isEnabled());
-        System.out.println(config.getAutoAdjust().getCadenceTolerance());
+       // System.out.println(config.getAutoAdjust().getCadenceTolerance());
         System.out.println(config.getAutoAdjust().getTolerance());
         System.out.println(config.getAutoAdjust().getSamples());
 

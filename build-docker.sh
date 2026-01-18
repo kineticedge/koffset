@@ -1,2 +1,2 @@
-docker buildx build -f ./koffset-exporter/docker/Dockerfile -t kafka-exporter:latest .
+docker buildx build -f ./koffset-exporter/docker/Dockerfile -t kofset-exporter:latest .
 

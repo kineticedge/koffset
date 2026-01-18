@@ -39,6 +39,7 @@ import java.util.stream.Collectors;
 
 public class LagAnalyzer {
 
+
     private static final Logger log = LoggerFactory.getLogger(LagAnalyzer.class);
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
 
@@ -87,14 +88,18 @@ Lag (Seconds) Math Yes The gap between the growing Head and the stationary Group
     private java.util.concurrent.ScheduledFuture<?> scheduledTask;
     private final long maxFutureDeltaMs = 3600_000L;
     private long refreshedAt;
-    private long timeoutMs = 30_000L;
+
+    //private long timeoutMs = 30_000L;
 
     //private Server server;
-
 
     public LagAnalyzer(final CollectorConfig config, final Admin admin) {
         this.config = config;
         this.admin = admin;
+    }
+
+    private long timeoutMs() {
+        return config.getAdminTimeout();
     }
 
     private final long minimalRefreshMs = 50L;
@@ -146,7 +151,7 @@ Lag (Seconds) Math Yes The gap between the growing Head and the stationary Group
 
     private void hydrateProducerHistory() throws Exception {
 
-        List<String> ids = admin.listGroups().all().get(timeoutMs, TimeUnit.MILLISECONDS)
+        List<String> ids = admin.listGroups().all().get(timeoutMs(), TimeUnit.MILLISECONDS)
                 .stream().map(GroupListing::groupId).toList();
 
         if (ids.isEmpty()) return;
@@ -154,7 +159,7 @@ Lag (Seconds) Math Yes The gap between the growing Head and the stationary Group
         Map<String, ListConsumerGroupOffsetsSpec> specs = ids.stream()
                 .collect(Collectors.toMap(id -> id, id -> new ListConsumerGroupOffsetsSpec()));
 
-        Set<TopicPartition> partitions = admin.listConsumerGroupOffsets(specs).all().get(timeoutMs, TimeUnit.MILLISECONDS)
+        Set<TopicPartition> partitions = admin.listConsumerGroupOffsets(specs).all().get(timeoutMs(), TimeUnit.MILLISECONDS)
                 .values().stream()
                 .flatMap(m -> m.keySet().stream())
                 .collect(Collectors.toSet());
@@ -163,9 +168,9 @@ Lag (Seconds) Math Yes The gap between the growing Head and the stationary Group
 
         // 1. Get the extreme poles (Earliest and Latest)
         var earliest = admin.listOffsets(partitions.stream().collect(Collectors.toMap(tp -> tp, tp -> OffsetSpec.forTimestamp(0L))))
-                .all().get(timeoutMs, TimeUnit.MILLISECONDS);
+                .all().get(timeoutMs(), TimeUnit.MILLISECONDS);
         var latest = admin.listOffsets(partitions.stream().collect(Collectors.toMap(tp -> tp, tp -> OffsetSpec.maxTimestamp())))
-                .all().get(timeoutMs, TimeUnit.MILLISECONDS);
+                .all().get(timeoutMs(), TimeUnit.MILLISECONDS);
 
         // 2. Prepare percentile queries
         Map<TopicPartition, Deque<long[]>> results = new HashMap<>();
@@ -189,7 +194,7 @@ Lag (Seconds) Math Yes The gap between the growing Head and the stationary Group
                 try {
                     // Search for the offset that existed at this time
                     var offsetResult = admin.listOffsets(Map.of(tp, OffsetSpec.forTimestamp(targetTs)))
-                            .all().get(timeoutMs, TimeUnit.MILLISECONDS).get(tp);
+                            .all().get(timeoutMs(), TimeUnit.MILLISECONDS).get(tp);
 
                     if (offsetResult != null && offsetResult.timestamp() > 0 && offsetResult.offset() > start.offset()) {
                         history.addLast(new long[]{offsetResult.offset(), offsetResult.timestamp()});
@@ -216,14 +221,40 @@ Lag (Seconds) Math Yes The gap between the growing Head and the stationary Group
                     var metadataFuture = fetchGroupMetadata(ids);
                     var offsetsFuture = fetchGroupOffsets(ids);
 
-                    return metadataFuture.thenCombine(offsetsFuture, GroupSnapshot::new);
+                    //return metadataFuture.thenCombine(offsetsFuture, GroupSnapshot::new);
+
+                    return metadataFuture.thenCombine(offsetsFuture, (metadata, offsets) -> {
+                        // 1. Reconcile metadata (remove groups that no longer exist)
+                        this.groupMetadata.keySet().retainAll(metadata.keySet());
+                        this.groupMetadata.putAll(metadata);
+
+                        // 2. Reconcile offset history (remove groups that no longer exist)
+                        this.offsetHistory.keySet().retainAll(metadata.keySet());
+
+                        return new GroupSnapshot(metadata, offsets);
+                    });
                 })
                 .thenCompose(snapshot -> {
-                    this.groupMetadata.putAll(snapshot.metadata());
+
+                    //TODO what if scrapped at this time?  would be good to have clear/putAll be atomic.
+                    //this.groupMetadata.clear();
+                    //this.groupMetadata.putAll(snapshot.metadata());
+
                     // Calculate lag using the offsets from the snapshot
                     return calculateLag(snapshot.offsets());
                 })
                 .thenAccept(results -> {
+
+
+                    // prune producer history on topic deleted
+                    Set<TopicPartition> activePartitions = results.values().stream()
+                            .flatMap(m -> m.keySet().stream())
+                            .collect(Collectors.toSet());
+                    this.producerHistory.keySet().retainAll(activePartitions);
+
+
+                    //TODO what if scrapped at this time?  would be good to have clear/putAll be atomic.
+                    groupLag.clear();
 
                     groupLag.putAll(results);
 
@@ -303,7 +334,7 @@ Lag (Seconds) Math Yes The gap between the growing Head and the stationary Group
         });
     }
 
-
+    // ... existing code ...
     private long interpolateTimestamp(TopicPartition tp, long offset) {
         Deque<long[]> history = producerHistory.get(tp);
 
@@ -311,8 +342,7 @@ Lag (Seconds) Math Yes The gap between the growing Head and the stationary Group
             return -1L;
         }
 
-        // If we only have 1 point, we can't interpolate a slope.
-        // We return that point's timestamp as the best factual guess.
+        // Case 1: Only one point. We can't determine a slope, so we return the best known timestamp.
         if (history.size() < 2) {
             return history.peekLast()[1];
         }
@@ -330,27 +360,36 @@ Lag (Seconds) Math Yes The gap between the growing Head and the stationary Group
             }
         }
 
-        // Case 1: Bracket found (Offset is between two known points)
+        // Case 2: Bracket found (Offset is between two known points)
         if (p1 != null && p2 != null) {
             if (p2[0] == p1[0]) return p1[1];
             double ratio = (double) (offset - p1[0]) / (p2[0] - p1[0]);
-            //System.out.println(">> " + p1[1]);
-            //System.out.println(">> " + (p1[1] + (long) (ratio * (p2[1] - p1[1]))));
             return p1[1] + (long) (ratio * (p2[1] - p1[1]));
         }
 
-        // Case 2: Offset is beyond our latest point (p2 is null)
-        // This shouldn't happen often for committed offsets, but if it does,
-        // we use the latest point's timestamp.
+        // Case 3: Offset is beyond our latest point (Consumer is ahead of our last poll)
+        // We use the slope of the NEWEST known segment to project forward.
         if (p1 != null) {
-            return p1[1];
+            long[] last = history.peekLast();
+            long[] prev = null;
+            var it = history.descendingIterator();
+            it.next(); // skip last
+            if (it.hasNext()) prev = it.next();
+
+            if (prev != null && last[0] != prev[0]) {
+                double ratio = (double) (offset - prev[0]) / (last[0] - prev[0]);
+                return prev[1] + (long) (ratio * (last[1] - prev[1]));
+            }
+            return last[1];
         }
 
-        // Case 3: Offset is before our oldest point (p1 is null)
-        // Refined: Use the slope of the OLDEST known segment to project backward.
-        long[] first = history.pollFirst(); // Get oldest
-        long[] second = history.peekFirst(); // Get second oldest
-        history.addFirst(first); // Put oldest back
+        // Case 4: Offset is before our oldest point (p1 is null)
+        // Use the slope of the OLDEST known segment to project backward.
+        long[] first = history.peekFirst();
+        long[] second = null;
+        var it = history.iterator();
+        it.next(); // skip first
+        if (it.hasNext()) second = it.next();
 
         if (second != null && second[0] != first[0]) {
             double ratio = (double) (offset - first[0]) / (second[0] - first[0]);
@@ -359,6 +398,7 @@ Lag (Seconds) Math Yes The gap between the growing Head and the stationary Group
 
         return first[1];
     }
+    // ... existing code ...
 
     private CompletableFuture<Map<TopicPartition, OffsetInfo>> fetchLatestOffsets(Set<TopicPartition> partitions) {
 
@@ -367,8 +407,8 @@ Lag (Seconds) Math Yes The gap between the growing Head and the stationary Group
         final Map<TopicPartition, OffsetSpec> maxTsRequest = partitions.stream()
                 .collect(Collectors.toMap(tp -> tp, tp -> OffsetSpec.maxTimestamp()));
 
-        var latestFuture = admin.listOffsets(latestRequest).all().toCompletionStage().toCompletableFuture().orTimeout(timeoutMs, TimeUnit.MILLISECONDS);
-        var maxTsFuture = admin.listOffsets(maxTsRequest).all().toCompletionStage().toCompletableFuture().orTimeout(timeoutMs, TimeUnit.MILLISECONDS);
+        var latestFuture = admin.listOffsets(latestRequest).all().toCompletionStage().toCompletableFuture().orTimeout(timeoutMs(), TimeUnit.MILLISECONDS);
+        var maxTsFuture = admin.listOffsets(maxTsRequest).all().toCompletionStage().toCompletableFuture().orTimeout(timeoutMs(), TimeUnit.MILLISECONDS);
 
         return latestFuture.thenCombine(maxTsFuture, (latestResult, maxTsResult) -> {
             long now = System.currentTimeMillis();
@@ -377,6 +417,17 @@ Lag (Seconds) Math Yes The gap between the growing Head and the stationary Group
                     tp -> {
                         long hwm = latestResult.containsKey(tp) ? latestResult.get(tp).offset() : 0L;
                         long ts = maxTsResult.containsKey(tp) ? maxTsResult.get(tp).timestamp() : -1L;
+
+
+                        // TODO 2000 a setting
+                        // IMPROVEMENT: If the producer is active and the last message
+                        // timestamp is very close to 'now' (e.g., within 2 seconds),
+                        // we treat 'now' as the true head timestamp.
+                        // This eliminates the "jitter" of the last batch's arrival time.
+                        if (ts > 0 && (now - ts) < 2000) {
+                            ts = now;
+                        }
+
                         // if producer is sending timestamps in the future it is protected value of max future.
                         if (ts <= 0 || ts > (now + maxFutureDeltaMs)) {
                             ts = now;
@@ -428,7 +479,7 @@ Lag (Seconds) Math Yes The gap between the growing Head and the stationary Group
 
     private CompletableFuture<List<String>> listGroupIds() {
         return admin.listGroups().all().toCompletionStage().toCompletableFuture()
-                .orTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                .orTimeout(timeoutMs(), TimeUnit.MILLISECONDS)
                 .thenApply(groups -> groups.stream().map(GroupListing::groupId).toList())
                 .exceptionally(e -> {
                     log.error("Failed to fetch consumer group IDs", e);
@@ -470,35 +521,35 @@ Lag (Seconds) Math Yes The gap between the growing Head and the stationary Group
     }
 
     private double velocity(Deque<long[]> window) {
-        double velocity = 0;
-        if (window.size() >= 3) {
-            long[] oldest = null;
-            for (long[] entry : window) {
-                if (entry[1] != -1) {
-                    oldest = entry;
-                    break;
-                }
-            }
+        if (window.size() < 2) {
+            return 0;
+        }
 
-            if (oldest != null) {
-                long[] newest = window.peekLast();
-                long offsetDelta = newest[0] - oldest[0];
-                long timeDeltaMs = newest[1] - oldest[1];
+        long[] newest = window.peekLast();
+        long[] oldest = null;
 
-                // REQUIREMENT: Must have seen movement over at least 10 seconds
-                // and processed enough records to be considered "active"
-                if (timeDeltaMs > 10000 && offsetDelta > 0) {
-                    velocity = offsetDelta / (timeDeltaMs / 1000.0);
-                }
+        // Find the oldest valid entry (skipping the -1 initialization marker)
+        for (long[] entry : window) {
+            if (entry[1] != -1) {
+                oldest = entry;
+                break;
             }
         }
 
-        // If the calculated velocity is extremely low (e.g. less than 1 record per minute),
-        // treat it as 0 to avoid massive ETA spikes from background noise/heartbeats.
-        if (velocity < 0.016) {
-            velocity = 0;
+
+        // timeDeltaMs -> velocityMinWindowMs
+
+        if (oldest != null && oldest != newest) {
+            long offsetDelta = newest[0] - oldest[0];
+            long timeDeltaMs = newest[1] - oldest[1];
+
+            long requiredWindowMs = lastIntervalMs * config.getVelocityWindowMultiplier();
+
+            if (timeDeltaMs >= requiredWindowMs && offsetDelta > 0) {
+                return offsetDelta / (timeDeltaMs / 1000.0);
+            }
         }
 
-        return velocity;
+        return 0;
     }
 }
