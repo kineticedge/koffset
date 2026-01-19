@@ -62,20 +62,59 @@ calculates:
 
 ## 🛠Installation/Getting Start
 
+The demo project contains a docker-compose file that can be used to quickly spin up a kafka cluster and koffset.
+
+Run on your developer machine
+
+```bash
+cd koffset-exporter
+export KOFFSET_KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+./run.sh
+```
+
+```bash
+docker pull ghcr.io/kineticedge/koffset-exporter:main
+```
+
+Check out the demo/docker-compose.yml
 
 ## ⚙️Configuration
 
 Configuration is handled via environment variables.
 
-| Variable                      | Default | Description                                                                     |
-|:------------------------------|:--------|:--------------------------------------------------------------------------------|
-| `KOFFSET_KAFKA_*`             | -       | any standard Kafka AdminClient config (e.g., `KOFFSET_KAFKA_BOOTSTRAP_SERVERS`) |
-| `KOFFSET_SERVER_PORT`         | `8080`  | port for Prometheus style metrics                                               |
-| `KOFFSET_AUTO_ADJUST_ENABLED` | `true`  | enable auto-alignment with scraper                                              |
-| `KOFFSET_COLLECTOR_INTERVAL`  | `30000` | fallback poll interval (ms) if auto-adjust is off / not executed ...            |
+| Variable                                       | Default | Description                                                                           |
+|:-----------------------------------------------|:--------|:--------------------------------------------------------------------------------------|
+| `KOFFSET_KAFKA_*`                              | -       | any standard Kafka AdminClient config (e.g., `KOFFSET_KAFKA_BOOTSTRAP_SERVERS`)       |
+| `KOFFSET_SERVER_PORT`                          | `8080`  | port for Prometheus style metrics                                                     |
+| `KOFFSET_AUTO_ADJUST_ENABLED`                  | `true`  | enable auto-alignment with scraper                                                    |
+| `KOFFSET_AUTO_ADJUST_SAMPLES`                  | `4`     | number of samples used for interval calculations (recalculates ever N)                |
+| `KOFFSET_AUTO_ADJUST_TOLERANCE`                | `0.10`  | the tolerances allowed on interval calcuation to avoid too aggressrive recalculations |
+| `KOFFSET_AUTO_ADJUST_SAMPLES`                  | `2000`  | minimal refresh interval to avoid the priamry scraper causing burden on kafka cluster |
+| `KOFFSET_COLLECTOR_ADMIN_TIMEOUT`              | `30000` | the timout used for any Kafka Admin API call                                          |
+| `KOFFSET_COLLECTOR_INITIAL_DELAY`              | `2000`  | the intial delay in starting the collector                                            |
+| `KOFFSET_COLLECTOR_INITIAL_INTERVAL`           | `5000`  | the intial interval for the collector; will remain default if auto adjust is false    |
+| `KOFFSET_COLLECTOR_VELOCITY_WINDOW_MULTIPLIER` | `2`     | number of intervals needed to be caculated prior to velocity metrics being emitted    |
+| `KOFFSET_COLLECTOR_HISTORY_SIZE`               |         | fallback poll interval (ms) if auto-adjust is off / not executed ...                  |
+| `KOFFSET_SERVER_PORT`                          | `8080`  | the port for the HTTP server                                                          |
+
 
 ## ⌨️ Usage
 
+When configuring prometheus, it is recommended to include parameter primary=True, this identifies this as the /metric call that is happening in a consistent
+scraping interval and is the one used by the auto-adjuster to have metrics refresh "right-before" the scrapes.
+
+```
+  - job_name: koffset
+    scrape_interval: 5s
+    metrics_path: /metrics
+    params:
+      primary: ["true"]
+    static_configs:
+      - targets:
+        - koffset:8080
+        labels:
+          job: "koffset-kafka-core"
+```
 
 ## 🖼️ Dashboards
 
@@ -90,3 +129,5 @@ this software is under the Apache 2.0 license, for details see the project's lic
 (https://github.com/kineticedge/koffset/blob/main/LICENSE)[LICENSE].
 
 ## 🤝Contributing
+
+**TBD**
