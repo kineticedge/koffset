@@ -166,13 +166,13 @@ scraping interval and is the one used by the auto-adjuster to have metrics refre
 
 The demo project contains a [](cluster lag) dashboard showcasing the metrics.
 In additional other kafka cluster dashboards are included.  
-For more ideas or dashboards to leverage, I recommend checking out [https://github.com/kineticedge/kafka-streams-dashboards](kafka-streams-dashboards).
+For more ideas or dashboards to leverage, I recommend checking out [kafka-streams-dashboards](https://github.com/kineticedge/kafka-streams-dashboards).
 It has dashboards well beyond kafka streams dashboards.
 
 ## 📜License
 
 this software is under the Apache 2.0 license, for details see the project's license file
-(https://github.com/kineticedge/koffset/blob/main/LICENSE)[LICENSE].
+[LICENSE](./LICENSE).
 
 ## 🤝Contributing
 
