@@ -36,9 +36,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ThreadFactory;
@@ -237,15 +235,6 @@ public class Server {
             writeLong(buffer, "koffset_group_members", groupLabel, description.members().size());
             long membersWithAssignment = description.members().stream().filter(m -> m.assignment() != null && !m.assignment().topicPartitions().isEmpty()).count();
             writeLong(buffer, "koffset_group_members_assigned", groupLabel, membersWithAssignment);
-
-//            // 4. Rebalance Status
-//            int isRebalancing = (description.groupState().name().contains("REBALANCE")) ? 1 : 0;
-//            writeLong(buffer, "koffset_group_rebalance_in_progress", groupLabel, isRebalancing);
-
-            // 5. Simple vs Coordinated (Is it using Kafka's group management?)
-            //writeLong(buffer, "koffset_group_is_simple", groupLabel, description.isSimpleConsumerGroup() ? 1 : 0);
-
-            // 6. Partition skew/distribution check
         });
 
         lag.values().stream()
@@ -278,12 +267,6 @@ public class Server {
                 writeLong(buffer, "koffset_group_lag", labels, detail.offsetLag());
                 writeSeconds(buffer, "koffset_group_lag_seconds", labels, detail.partitionHeadTimestamp() - detail.groupOffsetInterpolatedTimestamp());
 
-//                long stalenessMs = 0;
-//                if (detail.offsetLag() > 0 && detail.groupOffsetFirstObservedTimestamp() > 0) {
-//                    stalenessMs = System.currentTimeMillis() - detail.groupOffsetFirstObservedTimestamp();
-//                }
-//                writeSeconds(buffer, "koffset_group_offset_stale_seconds", labels, stalenessMs);
-
                 writeLong(buffer, "koffset_group_lag", labels, detail.offsetLag());
                 writeSeconds(buffer, "koffset_group_lag_seconds", labels, detail.partitionHeadTimestamp() - detail.groupOffsetInterpolatedTimestamp());
 
@@ -300,7 +283,6 @@ public class Server {
                     }
                 }
                 writeSeconds(buffer, "koffset_group_offset_stale_seconds", labels, stalenessMs);
-
 
                 writeLine(buffer, String.format("koffset_group_velocity_records_per_sec{%s} %.2f", labels, detail.groupVelocityRecordsPerSec()));
 

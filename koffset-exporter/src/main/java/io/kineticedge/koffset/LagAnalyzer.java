@@ -30,13 +30,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-// time since last successful run
-// execution time
-// metric size?
-// expired groups
-// failed groups
-// rebalancing groups
-
 public class LagAnalyzer {
 
 
@@ -49,13 +42,6 @@ public class LagAnalyzer {
     public record OffsetInfo(long offset, long timestamp) {
     }
 
-    /*
-    Latest Offset Broker Yes Producer is still sending data.
-Group Offset Broker No Consumer is not processing.
-Group Timestamp Interpolation No That specific offset was written at a fixed point in the past.
-Observed Timestamp Local Clock No It marks the start of the stuck period.
-Lag (Seconds) Math Yes The gap between the growing Head and the stationary Group is increasing.
-     */
     public record LagDetail(
             long partitionHeadOffset,
             long partitionHeadTimestamp,
@@ -95,10 +81,6 @@ Lag (Seconds) Math Yes The gap between the growing Head and the stationary Group
     private final long maxFutureDeltaMs = 3600_000L;
     private long refreshedAt;
 
-    //private long timeoutMs = 30_000L;
-
-    //private Server server;
-
     public LagAnalyzer(final CollectorConfig config, final Admin admin) {
         this.config = config;
         this.admin = admin;
@@ -107,8 +89,6 @@ Lag (Seconds) Math Yes The gap between the growing Head and the stationary Group
     private long timeoutMs() {
         return config.getAdminTimeout();
     }
-
-    private final long minimalRefreshMs = 50L;
 
     public void start() {
 
@@ -541,7 +521,6 @@ Lag (Seconds) Math Yes The gap between the growing Head and the stationary Group
                 break;
             }
         }
-
 
         // timeDeltaMs -> velocityMinWindowMs
 

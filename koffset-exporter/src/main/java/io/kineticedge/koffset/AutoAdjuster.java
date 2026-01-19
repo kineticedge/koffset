@@ -41,13 +41,7 @@ public class AutoAdjuster {
             return;
         }
 
-
         long targetInterval = detectedIntervalMs;
-
-//        if (detectedIntervalMs < minimalRefreshMs) {
-//            long multiplier = (long) Math.ceil((double) minimalRefreshMs / detectedIntervalMs);
-//            targetInterval = detectedIntervalMs * multiplier;
-//        }
 
         if (detectedIntervalMs < config.getMinRefreshMs()) {
             long multiplier = (long) Math.ceil((double) config.getMinRefreshMs() / detectedIntervalMs);
@@ -55,7 +49,6 @@ public class AutoAdjuster {
             log.debug("Detected interval {}ms is below minimum {}ms. Using multiplier x{} to set target to {}ms",
                     detectedIntervalMs, config.getMinRefreshMs(), multiplier, targetInterval);
         }
-
 
         // --- FRESHNESS TOLERANCE CHECK ---
         // We want our data to be "fresh". If the time since our last refresh (dataAge)
@@ -79,28 +72,6 @@ public class AutoAdjuster {
 
         }
 
-//        if (ageRatio <= config.getTolerance()) {
-//            log.debug("Data age {}ms is {}% of interval {}ms (within {}% tolerance). Skipping reschedule.",
-//                    dataAge, (int)(ageRatio * 100), targetInterval, (int)(config.getTolerance() * 100));
-//            return;
-//        }
-
-//        long currentInterval = lagAnalyzer.lastIntervalMs();
-//        double drift = Math.abs(currentInterval - targetInterval) / (double) targetInterval;
-//        if (drift <= config.getTolerance()) {
-//            log.debug("drift={} Current cadence {}ms is within {}% tolerance of target {}ms. Skipping reschedule.", ((long) (drift * 10000)) / 10000.0,
-//                    currentInterval, (int)(config.getTolerance() * 100), targetInterval);
-//            return;
-//        }
-
-//        // --- FIX: Don't reschedule if we are already running at this frequency ---
-//        // Allow a small drift (e.g., 500ms) to avoid jitter-induced resets
-//        if (Math.abs(lastIntervalMs() - targetInterval) < 5) {
-//            log.debug("Cadence stable at {}ms (target {}ms). Skipping reschedule.", lastIntervalMs(), targetInterval);
-//            return;
-//        }
-
-       // long safetyMargin = Math.min(500, (long) (targetInterval * 0.05));
         long leadTimeMs = lastRefreshDurationMs() + safetyMargin;
 
         long delayMillis = targetInterval - leadTimeMs;

@@ -1,9 +1,5 @@
 package io.kineticedge.koffset.util;
 
-import io.kineticedge.koffset.config.KoffsetConfig;
-
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 
 public class EnvConfigLoader extends ConfigLoader {
@@ -20,7 +16,7 @@ public class EnvConfigLoader extends ConfigLoader {
 
     //
 
-    // properCase to SNAKE_CASE
+    // SNAKE_CASE
     @Override
     protected String getKey(String name, String prefix) {
         String snake = name.replaceAll("(?<=[a-z])[A-Z]", "_$0").toUpperCase();
@@ -42,41 +38,4 @@ public class EnvConfigLoader extends ConfigLoader {
         return '_';
     }
 
-    public static class TestEnvironment extends Environment {
-
-        Map<String, String> env = new HashMap<>();
-
-        @Override
-        public Map<String, String> getAll() {
-            return env;
-        }
-
-        @Override
-        public Optional<String> get(String key) {
-            return Optional.ofNullable(env.get(key));
-        }
-
-        // testing 'hooks'
-
-        public void put(String key, String value) {
-            env.put(key, value);
-        }
-
-        public void clear() {
-            env.clear();
-        }
-
-    }
-
-    public static void main(String[] args) {
-        TestEnvironment e = new TestEnvironment();
-        e.put("KOFFSET_KAFKA_BOOTSTRAP_SERVERS", "a");
-        e.put("KOFFSET_KAFKA_FOO__BAR", "a");
-        e.put("KOFFSET_COLLECTOR_ADMIN_TIMEOUT", "555");
-        e.put("KOFFSET_COLLECTOR", "555");
-        EnvConfigLoader config = new EnvConfigLoader(e);
-        KoffsetConfig koffsetConfig = new KoffsetConfig();
-        config.populate(koffsetConfig, "KOFFSET_");
-        System.out.println(koffsetConfig);
-    }
 }

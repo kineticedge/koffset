@@ -3,7 +3,6 @@ package io.kineticedge.koffset.util;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -14,9 +13,6 @@ import java.util.stream.Stream;
 public abstract class ConfigLoader {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ConfigLoader.class);
-
-    // use to break apart properCase variable into words
-   // private static final Pattern PATTERN = Pattern.compile("(?<=[a-z])[A-Z]");
 
     //
 
