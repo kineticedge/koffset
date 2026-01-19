@@ -4,7 +4,7 @@
 . ./.classpath.sh
 
 
-METADATA=src/main/resources/META-INF/native-image_GEN
+METADATA=src/main/resources/META-INF/native-image_X
 
 $GRAALVM_HOME/bin/native-image \
   -cp ${CP} \

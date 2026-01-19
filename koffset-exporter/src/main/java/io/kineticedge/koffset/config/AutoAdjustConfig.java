@@ -1,8 +1,5 @@
 package io.kineticedge.koffset.config;
 
-import java.util.HashMap;
-import java.util.Map;
-
 public class AutoAdjustConfig {
 
     // enable autoadjustment - which is the default, so configuration needs
@@ -20,6 +17,7 @@ public class AutoAdjustConfig {
     // a misconfigured primary scraper from causing koffset to capture metrics too frequently
     private long minRefreshMs = 2000L;
 
+    //
 
     /* config loader */
     public AutoAdjustConfig() {
@@ -66,6 +64,8 @@ public class AutoAdjustConfig {
     public void setMinRefreshMs(long minRefreshMs) {
         this.minRefreshMs = minRefreshMs;
     }
+
+    //
 
     @Override
     public String toString() {

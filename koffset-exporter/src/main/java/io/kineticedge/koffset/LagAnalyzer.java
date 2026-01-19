@@ -78,6 +78,12 @@ Lag (Seconds) Math Yes The gap between the growing Head and the stationary Group
     private final Admin admin;
 
     private final Map<String, Map<TopicPartition, LagDetail>> groupLag = new ConcurrentHashMap<>();
+
+    //TODO move to ref so it can be atomically handled
+    private final java.util.concurrent.atomic.AtomicReference<Map<String, Map<TopicPartition, LagDetail>>> groupLagRef =
+            new java.util.concurrent.atomic.AtomicReference<>(Collections.emptyMap());
+
+
     private final Map<String, ConsumerGroupDescription> groupMetadata = new ConcurrentHashMap<>();
     private final Map<TopicPartition, Deque<long[]>> producerHistory = new ConcurrentHashMap<>();
     private final Map<String, Map<TopicPartition, Deque<long[]>>> offsetHistory = new ConcurrentHashMap<>();

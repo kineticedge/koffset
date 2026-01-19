@@ -99,6 +99,7 @@ services:
 
   koffset:
     image: koffset-exporter-dev:latest
+    pull_policy: never
     #image: koffset-exporter-native:latest
     container_name: ${COMPOSE_PROJECT_NAME}-koffset
     hostname: koffset
@@ -115,20 +116,3 @@ services:
       - "8080:8080"
     environment:
       KOFFSET_KAFKA_BOOTSTRAP_SERVERS: broker-1:9092
-
-  kle:
-    platform: linux/amd64
-    #image: koffset-exporter:latest
-    image: seglo/kafka-lag-exporter:latest
-    container_name: ${COMPOSE_PROJECT_NAME}-kle
-    hostname: kle
-    depends_on:
-      broker-1:
-        condition: service_healthy
-    volumes: 
-      - ./application.conf:/opt/docker/conf/application.conf
-    ports:
-      - "8000:8000"
-    environment:
-      KAFKA_LAG_EXPORTER_CLUSTERS.0.name: default
-      KAFKA_LAG_EXPORTER_CLUSTERS.0.bootstrap-brokers: broker-1:9092

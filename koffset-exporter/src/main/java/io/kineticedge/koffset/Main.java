@@ -2,13 +2,11 @@ package io.kineticedge.koffset;
 
 import io.kineticedge.koffset.config.KoffsetConfig;
 import io.kineticedge.koffset.util.ConfigLoader;
-import io.kineticedge.koffset.util.KafkaEnv;
+import io.kineticedge.koffset.util.EnvConfigLoader;
 import io.kineticedge.koffset.util.VersionInfo;
 import org.apache.kafka.clients.admin.Admin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Map;
 
 public class Main {
 
@@ -16,8 +14,12 @@ public class Main {
 
     static void main(String[] args) {
 
-        final ConfigLoader loader = new ConfigLoader();
-        final KoffsetConfig koffsetConfig = loader.parse(KoffsetConfig.class, "KOFFSET");
+        final ConfigLoader loader = new EnvConfigLoader();
+
+
+        KoffsetConfig koffsetConfig = new KoffsetConfig();
+
+        loader.populate(koffsetConfig, "KOFFSET");
 
         VersionInfo.banner(koffsetConfig);
         VersionInfo.log();

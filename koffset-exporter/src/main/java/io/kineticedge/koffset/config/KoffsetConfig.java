@@ -1,29 +1,8 @@
 package io.kineticedge.koffset.config;
 
-import io.kineticedge.koffset.util.ConfigLoader;
-
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 
-// configured through environment
-//
-// Kafka Admin Client configured via "KOFFSET_KAFKA_" prefix
-//
-// KOFFSET_AUTOADJUST_ENABLED = true
-// KOFFSET_AUTOADJUST_MIN_SAMPLES = 4
-// KOFFSET_AUTOADJUST_CADENCE_TOLERANCE = 0.10
-// KOFFSET_AUTOADJUST_COLLECTOR_MIN_REFRESH_MS = 500L
-//
-// KOFFSET_SERVER_PORT = 8080
-// KOFFSET_SERVER_AUTOADJUST_MIN_SAMPLES = 4
-// KOFFSET_SERVER_AUTOADJUST_TOLERANCE = 0.10
-//
-// KOFFSET_COLLECTOR_ADMIN_TIMEOUT = 30_000L
-// KOFFSET_COLLECTOR_DELAY
-// KOFFSET_COLLECTOR_INTERVAL
-// KOFFSET_COLLECTOR_HISTORY_SIZE = 500
-//
 public class KoffsetConfig {
 
     private CollectorConfig collector = new CollectorConfig();
@@ -79,6 +58,8 @@ public class KoffsetConfig {
     public void setKafka(Map<String, Object> kafka) {
         this.kafka = kafka;
     }
+
+    //
 
     @Override
     public String toString() {

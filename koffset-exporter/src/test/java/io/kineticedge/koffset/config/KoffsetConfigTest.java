@@ -1,11 +1,9 @@
 package io.kineticedge.koffset.config;
 
-import io.kineticedge.koffset.KafkaContainerTest;
 import io.kineticedge.koffset.util.ConfigLoader;
+import io.kineticedge.koffset.util.EnvConfigLoader;
 import io.kineticedge.koffset.util.TestEnvironment;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class KoffsetConfigTest {
 
@@ -14,7 +12,7 @@ class KoffsetConfigTest {
 
         final TestEnvironment env = new TestEnvironment();
 
-        final ConfigLoader loader = new ConfigLoader(env);
+        final ConfigLoader loader = new EnvConfigLoader(env);
 
         env.put("KOFFSET_AUTO_ADJUST_ENABLED", "false");
         env.put("KOFFSET_AUTO_ADJUST_MIN_SAMPLES", "10");
@@ -31,8 +29,9 @@ class KoffsetConfigTest {
         env.put("KOFFSET_KAFKA_BOOTSTRAP_SERVERS", "abc");
         env.put("KOFFSET_KAFKA_FOO__BAR", "xyz");
 
+        KoffsetConfig config = new KoffsetConfig();
 
-        KoffsetConfig config = loader.parse(KoffsetConfig.class, "KOFFSET");
+        loader.populate(config, "KOFFSET");
 
         System.out.println(config);
     }

@@ -1,22 +1,24 @@
-package io.kineticedge.koffset.util;
+package io.kineticedge.koffset.util.old;
+
+import io.kineticedge.koffset.config.KoffsetConfig;
+import io.kineticedge.koffset.util.Environment;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.Arrays;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-public abstract class ConfigLoader {
+public class ConfigLoader2 {
 
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ConfigLoader.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ConfigLoader2.class);
 
     // use to break apart properCase variable into words
-   // private static final Pattern PATTERN = Pattern.compile("(?<=[a-z])[A-Z]");
+    private static final Pattern PATTERN = Pattern.compile("(?<=[a-z])[A-Z]");
 
     //
 
@@ -25,7 +27,7 @@ public abstract class ConfigLoader {
         void set(Field field, Object object);
     }
 
-    public record Field(String name, Class<?> returnType, Method getter, Method setter, String prefix, String sourceKey) {
+    public record Field(String name, Class<?> returnType, Method getter, Method setter, String prefix) {
 
         @SuppressWarnings("unchecked")
         public <T> T get(Object object) {
@@ -71,9 +73,9 @@ public abstract class ConfigLoader {
             }
         }
 
-//       public String envVar() {
-//            return getEnvironmentVariable(name(), prefix());
-//        }
+       public String envVar() {
+            return getEnvironmentVariable(name(), prefix());
+        }
 
     }
 
@@ -83,54 +85,30 @@ public abstract class ConfigLoader {
     private Environment env;
 
     private final Map<Class<?>, PropertySetter> handlers = Map.ofEntries(
-            Map.<Class<?>, PropertySetter>entry(String.class, (m, o) -> getValue(m.sourceKey()).ifPresent(s -> m.set(o, s))),
-            Map.<Class<?>, PropertySetter>entry(Integer.TYPE, (m, o) -> getValue(m.sourceKey()).ifPresent(s -> m.set(o, Integer.parseInt(s)))),
-            Map.<Class<?>, PropertySetter>entry(Integer.class, (m, o) -> getValue(m.sourceKey()).ifPresent(s -> m.set(o, Integer.parseInt(s)))),
-            Map.<Class<?>, PropertySetter>entry(Long.TYPE, (m, o) -> getValue(m.sourceKey()).ifPresent(s -> m.set(o, Long.parseLong(s)))),
-            Map.<Class<?>, PropertySetter>entry(Long.class, (m, o) -> getValue(m.sourceKey()).ifPresent(s -> m.set(o, Long.parseLong(s)))),
-            Map.<Class<?>, PropertySetter>entry(Boolean.TYPE, (m, o) -> getValue(m.sourceKey()).ifPresent(s -> m.set(o, Boolean.parseBoolean(s)))),
-            Map.<Class<?>, PropertySetter>entry(Boolean.class, (m, o) -> getValue(m.sourceKey()).ifPresent(s -> m.set(o, Boolean.parseBoolean(s)))),
-            Map.<Class<?>, PropertySetter>entry(Double.TYPE, (m, o) -> getValue(m.sourceKey()).ifPresent(s -> m.set(o, Double.parseDouble(s)))),
-            Map.<Class<?>, PropertySetter>entry(Double.class, (m, o) -> getValue(m.sourceKey()).ifPresent(s -> m.set(o, Double.parseDouble(s)))),
+            Map.<Class<?>, PropertySetter>entry(String.class, (m, o) -> env.get(m.envVar()).ifPresent(s -> m.set(o, s))),
+            Map.<Class<?>, PropertySetter>entry(Integer.TYPE, (m, o) -> env.get(m.envVar()).ifPresent(s -> m.set(o, Integer.parseInt(s)))),
+            Map.<Class<?>, PropertySetter>entry(Integer.class, (m, o) -> env.get(m.envVar()).ifPresent(s -> m.set(o, Integer.parseInt(s)))),
+            Map.<Class<?>, PropertySetter>entry(Long.TYPE, (m, o) -> env.get(m.envVar()).ifPresent(s -> m.set(o, Long.parseLong(s)))),
+            Map.<Class<?>, PropertySetter>entry(Long.class, (m, o) -> env.get(m.envVar()).ifPresent(s -> m.set(o, Long.parseLong(s)))),
+            Map.<Class<?>, PropertySetter>entry(Boolean.TYPE, (m, o) -> env.get(m.envVar()).ifPresent(s -> m.set(o, Boolean.parseBoolean(s)))),
+            Map.<Class<?>, PropertySetter>entry(Boolean.class, (m, o) -> env.get(m.envVar()).ifPresent(s -> m.set(o, Boolean.parseBoolean(s)))),
+            Map.<Class<?>, PropertySetter>entry(Double.TYPE, (m, o) -> env.get(m.envVar()).ifPresent(s -> m.set(o, Double.parseDouble(s)))),
+            Map.<Class<?>, PropertySetter>entry(Double.class, (m, o) -> env.get(m.envVar()).ifPresent(s -> m.set(o, Double.parseDouble(s)))),
             Map.<Class<?>, PropertySetter>entry(Map.class, (m, o) -> {
                 final Map<String, Object> map = m.getOrCreate(o);
-                final String prefix = m.sourceKey();
-                final String filter = prefix + delimiter();
-                getAllKeys().stream()
+                final String prefix = m.envVar();
+                final String filter = prefix + "_";
+                env.getAll().keySet().stream()
                         .filter(k -> k.startsWith(filter))
                         .forEach(k -> {
-                            final String key = convertKey(k.substring(filter.length()));
-                            getValue(k).ifPresent(v -> map.put(key, v));
+                            String key = k.substring(filter.length())
+                                    .replaceAll("(?<!_)_(?!_)", ".")
+                                    .replaceAll("__", "_")
+                                    .toLowerCase();
+                            env.get(k).ifPresent(v -> map.put(key, v));
                         });
-            }),
-            Map.entry(List.class, (m, o) -> {
-                final List<Object> list = m.getOrCreate(o);
-                final String prefix = m.sourceKey() + delimiter();
-
-                // Scan for keys like PREFIX_0, PREFIX_1, etc.
-                for (int i = 0; ; i++) {
-                    final String indexedKey = prefix + i;
-                    Optional<String> value = getValue(indexedKey);
-
-                    if (value.isPresent()) {
-                        list.add(value.get());
-                    } else {
-                        // Stop at the first missing index
-                        break;
-                    }
-                }
             })
     );
-
-    private String convertKey(String key) {
-        final String d = String.valueOf(delimiter());
-        final String dd = d + d;
-        if (delimiter() != '.') {
-            final String regex = "(?<!" + Pattern.quote(d) + ")" + Pattern.quote(d) + "(?!" + Pattern.quote(d) + ")";
-            key = key.replaceAll(regex, ".");
-        }
-        return key.replace(dd, d).toLowerCase();
-    }
 
     private PropertySetter findProcessor(Class<?> type, String basePackage) {
         if (handlers.containsKey(type)) {
@@ -141,7 +119,7 @@ public abstract class ConfigLoader {
             return (m, o) -> {
                 Object sub = m.getOrCreate(o);
                 if (sub != null) {
-                    populate(sub, sub.getClass(), m.sourceKey() + delimiter());
+                    populate(sub, sub.getClass(), m.envVar() + "_");
                 }
             };
         }
@@ -149,21 +127,16 @@ public abstract class ConfigLoader {
         return null;
     }
 
-    public ConfigLoader() {
+    public ConfigLoader2() {
         this.env = new Environment();
     }
 
     // exposed for testing
-    public ConfigLoader(Environment env) {
+    public ConfigLoader2(Environment env) {
         this.env = env;
     }
 
-    public <T> void populate(final T object, String prefix) {
-
-        if (!prefix.endsWith("" + delimiter())) {
-            prefix += delimiter();
-        }
-
+    public <T> void populate(final T object, final String prefix) {
         populate(object, object.getClass(), prefix);
     }
 
@@ -198,11 +171,7 @@ public abstract class ConfigLoader {
         return Stream.of(clazz.getDeclaredMethods())
                 .filter(m -> !Modifier.isStatic(m.getModifiers()))
                 .filter(m -> Modifier.isPublic(m.getModifiers()))
-                .filter(m -> !m.getName().equals("toString") &&
-                        !m.getName().equals("getClass") &&
-                        !m.getName().equals("hashCode") &&
-                        !m.getName().equals("clone")
-                )
+                .filter(m -> !m.getName().equals("toString")) // any other "gotchas"?
                 .filter(m -> m.getParameterCount() == 0)
                 // supported types - primitives, Map, classes in same package ...
                 .map(m -> {
@@ -212,8 +181,7 @@ public abstract class ConfigLoader {
                                     m.getReturnType(),
                                     m,
                                     findSetter(clazz, name, m.getReturnType()).orElse(null),
-                                    prefix,
-                                    getKey(name, prefix)
+                                    prefix
                             );
                         }
                 );
@@ -237,25 +205,47 @@ public abstract class ConfigLoader {
     }
 
 
-//    private static String getEnvironmentVariable(final String string, final String prefix) {
-//        return prefix + PATTERN.matcher(string).replaceAll(match -> "_" + match.group()).toUpperCase();
-//    }
+    private static String getEnvironmentVariable(final String string, final String prefix) {
+        return prefix + PATTERN.matcher(string).replaceAll(match -> "_" + match.group()).toUpperCase();
+    }
 
-    protected abstract char delimiter();
+    //
 
-    /**
-     * Translates a property name (e.g., "bootstrapServers") into a source-specific key (e.g., "KAFKA_BOOTSTRAP_SERVERS").
-     */
-    protected abstract String getKey(String name, String prefix);
+    public static class TestEnvironment extends Environment {
 
-    /**
-     * Retrieves an optional value from the source (Env, Properties, etc.)
-     */
-    protected abstract Optional<String> getValue(String key);
+        Map<String, String> env = new HashMap<>();
 
-    /**
-     * Provides all keys available in the source (used for Map scanning).
-     */
-    protected abstract java.util.Set<String> getAllKeys();
+        @Override
+        public Map<String, String> getAll() {
+            return env;
+        }
+
+        @Override
+        public Optional<String> get(String key) {
+            return Optional.ofNullable(env.get(key));
+        }
+
+        // testing 'hooks'
+
+        public void put(String key, String value) {
+            env.put(key, value);
+        }
+
+        public void clear() {
+            env.clear();
+        }
+
+    }
+
+    public void main(String[] args) {
+        TestEnvironment e = new TestEnvironment();
+        e.put("KOFFSET_KAFKA_BOOTSTRAP_SERVERS", "a");
+        e.put("KOFFSET_COLLECTOR_ADMIN_TIMEOUT", "555");
+        e.put("KOFFSET_COLLECTOR", "555");
+        ConfigLoader2 config = new ConfigLoader2(e);
+        KoffsetConfig koffsetConfig = new KoffsetConfig();
+        config.populate(koffsetConfig, "KOFFSET_");
+        System.out.println(koffsetConfig);
+    }
 
 }

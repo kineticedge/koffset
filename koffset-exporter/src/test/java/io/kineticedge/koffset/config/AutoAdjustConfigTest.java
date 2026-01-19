@@ -1,6 +1,7 @@
 package io.kineticedge.koffset.config;
 
 import io.kineticedge.koffset.util.ConfigLoader;
+import io.kineticedge.koffset.util.EnvConfigLoader;
 import io.kineticedge.koffset.util.TestEnvironment;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +15,7 @@ class AutoAdjustConfigTest {
         TestEnvironment env = new TestEnvironment();
 
 
-        ConfigLoader loader = new ConfigLoader(env);
+        ConfigLoader loader = new EnvConfigLoader(env);
 
         env.put("KOFFSET_AUTO_ADJUST_ENABLED", "false");
         env.put("KOFFSET_AUTO_ADJUST_TOLERANCE", "0.60");
@@ -22,7 +23,9 @@ class AutoAdjustConfigTest {
         env.put("KOFFSET_AUTO_ADJUST_CADENCE_TOLERANCE", "111");
         env.put("KOFFSET_KAFKA_BOOTSTRAP_SERVERS", "abc");
 
-        KoffsetConfig config = loader.parse(KoffsetConfig.class, "KOFFSET");
+        KoffsetConfig config = new KoffsetConfig();
+
+        loader.populate(config, "KOFFSET");
 
 
         System.out.println("**");

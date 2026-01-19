@@ -2,6 +2,7 @@ package io.kineticedge.koffset.util;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 public class TestEnvironment extends Environment {
 
@@ -13,8 +14,8 @@ public class TestEnvironment extends Environment {
     }
 
     @Override
-    public String get(String key) {
-        return env.get(key);
+    public Optional<String> get(String key) {
+        return Optional.of(env.get(key));
     }
 
     // testing 'hooks'

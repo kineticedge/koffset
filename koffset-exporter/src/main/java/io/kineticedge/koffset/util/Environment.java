@@ -3,6 +3,7 @@ package io.kineticedge.koffset.util;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static io.kineticedge.koffset.util.StringUtil.isBlank;
 
@@ -42,8 +43,8 @@ public class Environment {
         return val;
     }
 
-    public String get(String name) {
-        return getEnv(name);
+    public Optional<String> get(String name) {
+        return Optional.ofNullable(getEnv(name));
     }
 
     public long getAsLong(String name, long defaultValue) {

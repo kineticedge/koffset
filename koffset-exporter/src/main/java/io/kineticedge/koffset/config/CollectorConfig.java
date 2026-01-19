@@ -16,6 +16,7 @@ public class CollectorConfig {
 
     private int historySize;
 
+    //
 
     /* config loader */
     public CollectorConfig() {
@@ -65,7 +66,6 @@ public class CollectorConfig {
         this.velocityWindowMultiplier = Math.max(2, velocityWindowMultiplier);
     }
 
-
     public int getHistorySize() {
         return historySize;
     }
@@ -73,6 +73,8 @@ public class CollectorConfig {
     public void setHistorySize(int historySize) {
         this.historySize = historySize;
     }
+
+    //
 
     @Override
     public String toString() {
