@@ -15,6 +15,8 @@ A high-performance Kafka Consumer Offset & Lag Monitoring tool.
 `koffset` provides real-time visibility into Kafka consumer group lag using only the Admin Client API, making it
 lightweight, secure, and easy to deploy.
 
+![dashboard screenshot](./docs/koffset-dashboard-example-1.png)
+
 ## ✨Features
 
 * Modern Java Stack – Built on Java 25, leveraging the latest JVM performance enhancements and language features.
@@ -64,7 +66,8 @@ calculates:
 
 The demo project contains a docker-compose file that can be used to quickly spin up a kafka cluster and koffset.
 
-Run on your developer machine
+Run on your developer machine. A simple `./run.sh` will compile the code and then run it; it leverages the 
+gradle classpath to avoid having to untar a distribution to run it.
 
 ```bash
 cd koffset-exporter
@@ -75,6 +78,8 @@ export KOFFSET_KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 ```bash
 docker pull ghcr.io/kineticedge/koffset-exporter:main
 ```
+
+use the `./build-docker-*` creates to create a container locally. 
 
 Check out the demo/docker-compose.yml
 
@@ -94,8 +99,48 @@ Configuration is handled via environment variables.
 | `KOFFSET_COLLECTOR_INITIAL_DELAY`              | `2000`  | the intial delay in starting the collector                                            |
 | `KOFFSET_COLLECTOR_INITIAL_INTERVAL`           | `5000`  | the intial interval for the collector; will remain default if auto adjust is false    |
 | `KOFFSET_COLLECTOR_VELOCITY_WINDOW_MULTIPLIER` | `2`     | number of intervals needed to be caculated prior to velocity metrics being emitted    |
-| `KOFFSET_COLLECTOR_HISTORY_SIZE`               |         | fallback poll interval (ms) if auto-adjust is off / not executed ...                  |
+| `KOFFSET_COLLECTOR_HISTORY_SIZE`               | -       | fallback poll interval (ms) if auto-adjust is off / not executed ...                  |
 | `KOFFSET_SERVER_PORT`                          | `8080`  | the port for the HTTP server                                                          |
+
+##  📈 Metrics
+
+All metrics are prefixed with `koffset_` and exported in Prometheus format at the `/metrics` endpoint.
+
+### Collection & Refresh Metrics
+| Metric                               | Labels | Description                                                                     |
+|:-------------------------------------|:-------|:--------------------------------------------------------------------------------|
+| `koffset_refreshed_ts`               | -      | Unix timestamp (in seconds) of the last successful metadata and offset refresh. |
+| `koffset_refreshed_duration_seconds` | -      | The time taken to complete the last refresh cycle from Kafka.                   |
+| `koffset_refreshed_age_seconds`      | -      | Time elapsed since the last successful refresh cycle.                           |
+
+### Summary & Group Statistics
+| Metric                               | Labels                          | Description                                                                                 |
+|:-------------------------------------|:--------------------------------|:--------------------------------------------------------------------------------------------|
+| `koffset_number_of_groups`           |  -                              | Total number of consumer groups discovered in the cluster.                                  |
+| `koffset_number_of_group_partitions` | -                               | Total number of unique topic-partitions being tracked across all groups.                    |
+| `koffset_group_info`                 | `group`, `state`, `coordinator` | Value is always `1`. Provides current group state (e.g., STABLE, EMPTY) and coordinator ID. |
+| `koffset_group_members`              | `group`                         | The total number of members currently in the consumer group.                                |
+| `koffset_group_members_assigned`     | `group`                         | The number of group members that have at least one partition assigned to them.              |
+
+### Topic & Partition Head Metrics
+| Metric                     | Labels                 | Description                                                       |
+|:---------------------------|:-----------------------|:------------------------------------------------------------------|
+| `koffset_latest_offset`    | `topic`, `partition`   | The current High Watermark (HWM) or end-offset for the partition. |
+| `koffset_latest_offset_ts` | `topic`, `partition`   | The timestamp associated with the latest offset in the partition. |
+
+### Consumer Lag & Velocity Metrics
+| Metric                                    | Labels                         | Description                                                                                                 |
+|:------------------------------------------|:-------------------------------|:------------------------------------------------------------------------------------------------------------|
+| `koffset_group_offset`                    | `group`, `topic`, `partition`  | The last committed offset for the consumer group.                                                           |
+| `koffset_group_offset_interpolated_ts`    | `group`, `topic`, `partition`  | The estimated broker-time for the committed offset, calculated via linear interpolation.                    |
+| `koffset_group_offset_observed_ts`        | `group`, `topic`, `partition`  | The wall-clock time when the current committed offset was first observed by the exporter.                   |
+| `koffset_group_lag`                       | `group`, `topic`, `partition`  | The numeric lag (records) between the partition head and the group's committed offset.                      |
+| `koffset_group_lag_seconds`               | `group`, `topic`, `partition`  | The extrapolated time-based lag (in seconds), measuring the distance between the consumer and the log head. |
+| `koffset_group_offset_stale_seconds`      | `group`, `topic`, `partition`  | Measures how long the consumer has been stationary.                                                         |
+| *`koffset_group_velocity_records_per_sec` | `group`, `topic`, `partition`  | The moving average processing speed of the consumer group (records/second).                                 |
+| *`koffset_group_catchup_eta_seconds`      | `group`, `topic`, `partition`  | Estimated time remaining until the consumer reaches the log head based on current velocity.                 |
+
+\* While this project is currently in alpha and any metric may change or be removed, this are highly experimental and even more likely to change or removed based on their lack of value.
 
 
 ## ⌨️ Usage
@@ -117,6 +162,7 @@ scraping interval and is the one used by the auto-adjuster to have metrics refre
 ```
 
 ## 🖼️ Dashboards
+
 
 The demo project contains a [](cluster lag) dashboard showcasing the metrics.
 In additional other kafka cluster dashboards are included.  

@@ -238,12 +238,6 @@ public class Server {
             long membersWithAssignment = description.members().stream().filter(m -> m.assignment() != null && !m.assignment().topicPartitions().isEmpty()).count();
             writeLong(buffer, "koffset_group_members_assigned", groupLabel, membersWithAssignment);
 
-            // 3. Coordinator Info (Which broker is managing this group?)
-            if (description.coordinator() != null) {
-                String coordLabels = String.format("%s,coordinator=\"%d\"", groupLabel, description.coordinator().id());
-                writeLine(buffer, String.format("koffset_group_coordinator_info{%s} 1", coordLabels));
-            }
-
 //            // 4. Rebalance Status
 //            int isRebalancing = (description.groupState().name().contains("REBALANCE")) ? 1 : 0;
 //            writeLong(buffer, "koffset_group_rebalance_in_progress", groupLabel, isRebalancing);
