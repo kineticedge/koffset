@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.LongSupplier;
 
 public class AutoAdjuster {
 
@@ -14,13 +15,21 @@ public class AutoAdjuster {
     private final AutoAdjustConfig config;
     private final LagAnalyzer lagAnalyzer;
 
+    private final LongSupplier clock;
+
     private final List<Long> scrapeTimestamps = new ArrayList<>();
 
     private boolean logged;
 
     public AutoAdjuster(final AutoAdjustConfig config, final LagAnalyzer lagAnalyzer) {
+        this(config, lagAnalyzer, System::currentTimeMillis);
+    }
+
+    /* for testing - use custom clock for consistent testing */
+    public AutoAdjuster(final AutoAdjustConfig config, final LagAnalyzer lagAnalyzer, LongSupplier clock) {
         this.config = config;
         this.lagAnalyzer = lagAnalyzer;
+        this.clock = clock;
     }
 
     private long lastIntervalMs() {
@@ -41,6 +50,7 @@ public class AutoAdjuster {
             return;
         }
 
+//        long targetInterval = Math.min(1, detectedIntervalMs);
         long targetInterval = detectedIntervalMs;
 
         if (detectedIntervalMs < config.getMinRefreshMs()) {
@@ -53,7 +63,7 @@ public class AutoAdjuster {
         // --- FRESHNESS TOLERANCE CHECK ---
         // We want our data to be "fresh". If the time since our last refresh (dataAge)
         // is more than the allowed tolerance percentage of the interval, we adjust.
-        long now = System.currentTimeMillis();
+        long now = clock.getAsLong();//System.currentTimeMillis();
         long dataAge = now - lagAnalyzer.getRefreshedAt();
         double ageRatio = (double) dataAge / targetInterval;
 
@@ -85,7 +95,7 @@ public class AutoAdjuster {
 
 
     public void trackScrapeCadence() {
-        long now = System.currentTimeMillis();
+        long now = clock.getAsLong();//System.currentTimeMillis();
         synchronized (scrapeTimestamps) {
             scrapeTimestamps.add(now);
             if (scrapeTimestamps.size() > config.getSamples()) {

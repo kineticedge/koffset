@@ -16,18 +16,21 @@ public class CollectorConfig {
 
     private int historySize;
 
+    private long freshnessThresholdMs = 200L;
+
     //
 
     /* config loader */
     public CollectorConfig() {
     }
 
-    /* property loader */
-    public CollectorConfig(long adminTimeout, long initialDelay, long initialInterval, int historySize) {
+    /* testing */
+    public CollectorConfig(long adminTimeout, long initialDelay, long initialInterval, int historySize, long freshnessThresholdMs) {
         this.adminTimeout = adminTimeout;
         this.initialDelay = initialDelay;
         this.initialInterval = initialInterval;
         this.historySize = historySize;
+        this.freshnessThresholdMs = freshnessThresholdMs;
     }
 
     //
@@ -57,12 +60,10 @@ public class CollectorConfig {
     }
 
     public int getVelocityWindowMultiplier() {
-        // TODO: can be removed once ConfigLoader is switched to using setter vs field reflection
-        return Math.max(2, velocityWindowMultiplier);
+        return velocityWindowMultiplier;
     }
 
     public void setVelocityWindowMultiplier(int velocityWindowMultiplier) {
-        // Enforce a minimum of 2 to prevent users from making things "bad"
         this.velocityWindowMultiplier = Math.max(2, velocityWindowMultiplier);
     }
 
@@ -72,6 +73,14 @@ public class CollectorConfig {
 
     public void setHistorySize(int historySize) {
         this.historySize = historySize;
+    }
+
+    public long getFreshnessThresholdMs() {
+        return freshnessThresholdMs;
+    }
+
+    public void setFreshnessThresholdMs(long freshnessThresholdMs) {
+        this.freshnessThresholdMs = freshnessThresholdMs;
     }
 
     //
@@ -84,6 +93,7 @@ public class CollectorConfig {
                 ", interval=" + initialInterval +
                 ", velocityWindowMultiplier=" + velocityWindowMultiplier +
                 ", historySize=" + historySize +
+                ", freshnessThresholdMs=" + freshnessThresholdMs +
                 '}';
     }
 }

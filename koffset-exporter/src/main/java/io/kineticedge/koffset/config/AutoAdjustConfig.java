@@ -23,7 +23,7 @@ public class AutoAdjustConfig {
     public AutoAdjustConfig() {
     }
 
-    /* property loader */
+    /* testing */
     public AutoAdjustConfig(boolean enabled, int samples, double tolerance, long minRefreshMs) {
         this.enabled = enabled;
         this.samples = samples;

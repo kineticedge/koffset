@@ -14,6 +14,13 @@ public abstract class ConfigLoader {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ConfigLoader.class);
 
+    // Interface Defaults
+    private static final Map<Class<?>, Class<?>> INTERFACE_IMPLEMENTATIONS = Map.of(
+            Map.class, java.util.HashMap.class,
+            List.class, java.util.ArrayList.class,
+            java.util.Set.class, java.util.HashSet.class
+    );
+
     //
 
     @FunctionalInterface
@@ -43,7 +50,10 @@ public abstract class ConfigLoader {
         @SuppressWarnings("unchecked")
         public <T> T create(Object object) {
             try {
-                return (T) setter().invoke(object, returnType.getDeclaredConstructor().newInstance());
+                Class<?> typeToCreate = INTERFACE_IMPLEMENTATIONS.getOrDefault(returnType, returnType);
+                final T obj = (T) typeToCreate.getDeclaredConstructor().newInstance();
+                setter().invoke(object, obj);
+                return obj;
             } catch (IllegalAccessException | NoSuchMethodException | InstantiationException | InvocationTargetException e) {
                 throw new RuntimeException(e);
             }
@@ -55,24 +65,13 @@ public abstract class ConfigLoader {
                 T value = (T) getter().invoke(object);
                 if (value == null) {
                     value = create(object);
-                    if (setter() != null) {
-                        setter().invoke(object, value);
-                    } else {
-                        throw new IllegalStateException("No setter available for field: " + name());
-                    }
                 }
                 return value;
             } catch (IllegalAccessException | InvocationTargetException e) {
                 throw new RuntimeException(e);
             }
         }
-
-//       public String envVar() {
-//            return getEnvironmentVariable(name(), prefix());
-//        }
-
     }
-
 
     //
 
@@ -136,9 +135,7 @@ public abstract class ConfigLoader {
         if (type.getName().startsWith(basePackage)) {
             return (m, o) -> {
                 Object sub = m.getOrCreate(o);
-                if (sub != null) {
-                    populate(sub, sub.getClass(), m.sourceKey() + delimiter());
-                }
+                populate(sub, sub.getClass(), m.sourceKey() + delimiter());
             };
         }
 

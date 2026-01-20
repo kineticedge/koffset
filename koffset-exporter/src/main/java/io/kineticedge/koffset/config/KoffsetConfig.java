@@ -12,16 +12,7 @@ public class KoffsetConfig {
 
     //
 
-    /* config loader */
     public KoffsetConfig() {
-    }
-
-    /* property loader */
-    public KoffsetConfig(CollectorConfig collector, ServerConfig server, AutoAdjustConfig autoAdjust, Map<String, Object> kafka) {
-        this.collector = collector;
-        this.server = server;
-        this.autoAdjust = autoAdjust;
-        this.kafka = kafka;
     }
 
     //

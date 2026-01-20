@@ -48,7 +48,6 @@ public class Server {
     private static final Logger log = LoggerFactory.getLogger(Server.class);
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(java.time.ZoneId.of("UTC"));
 
-
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
     private Channel serverChannel;
@@ -130,9 +129,11 @@ public class Server {
         } finally {
             if (bossGroup != null) {
                 bossGroup.shutdownGracefully(0, 1, TimeUnit.SECONDS);
+                bossGroup = null;
             }
             if (workerGroup != null) {
                 workerGroup.shutdownGracefully(0, 1, TimeUnit.SECONDS);
+                workerGroup = null;
             }
         }
     }

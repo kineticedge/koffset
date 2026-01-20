@@ -28,6 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 
 public class LagAnalyzer {
@@ -62,6 +63,7 @@ public class LagAnalyzer {
 
     private final CollectorConfig config;
     private final Admin admin;
+    private final LongSupplier clock;
 
     private final Map<String, Map<TopicPartition, LagDetail>> groupLag = new ConcurrentHashMap<>();
 
@@ -82,8 +84,14 @@ public class LagAnalyzer {
     private long refreshedAt;
 
     public LagAnalyzer(final CollectorConfig config, final Admin admin) {
+        this(config, admin, System::currentTimeMillis);
+    }
+
+    /* expose for testing */
+    public LagAnalyzer(final CollectorConfig config, final Admin admin, LongSupplier clock) {
         this.config = config;
         this.admin = admin;
+        this.clock = clock;
     }
 
     private long timeoutMs() {
@@ -92,7 +100,7 @@ public class LagAnalyzer {
 
     public void start() {
 
-        this.refreshedAt = System.currentTimeMillis();
+        this.refreshedAt = clock.getAsLong();
         this.lastIntervalMs = config.getInitialInterval();
 
         // synchronous hydration, minimizes misinformation on restart
@@ -200,7 +208,7 @@ public class LagAnalyzer {
     }
 
     private void refresh() {
-        final long start = System.currentTimeMillis();
+        final long start = clock.getAsLong();
 
         listGroupIds()
                 .<GroupSnapshot>thenCompose(ids -> {
@@ -244,8 +252,8 @@ public class LagAnalyzer {
 
                     groupLag.putAll(results);
 
-                    lastRefreshDurationMs = System.currentTimeMillis() - start;
-                    refreshedAt = System.currentTimeMillis();
+                    lastRefreshDurationMs = clock.getAsLong() - start;
+                    refreshedAt = clock.getAsLong();
 
                 })
                 .exceptionally(ex -> {
@@ -264,7 +272,7 @@ public class LagAnalyzer {
 
         return fetchLatestOffsets(allPartitions).thenApply(latestOffsets -> {
             Map<String, Map<TopicPartition, LagDetail>> results = new TreeMap<>();
-            long now = System.currentTimeMillis();
+            long now = clock.getAsLong();
 
             // 1. Update Producer Timeline
             latestOffsets.forEach((tp, info) -> {
@@ -397,20 +405,20 @@ public class LagAnalyzer {
         var maxTsFuture = admin.listOffsets(maxTsRequest).all().toCompletionStage().toCompletableFuture().orTimeout(timeoutMs(), TimeUnit.MILLISECONDS);
 
         return latestFuture.thenCombine(maxTsFuture, (latestResult, maxTsResult) -> {
-            long now = System.currentTimeMillis();
+            long now = clock.getAsLong();
             return partitions.stream().collect(Collectors.toMap(
                     tp -> tp,
                     tp -> {
                         long hwm = latestResult.containsKey(tp) ? latestResult.get(tp).offset() : 0L;
                         long ts = maxTsResult.containsKey(tp) ? maxTsResult.get(tp).timestamp() : -1L;
 
-
                         // TODO 2000 a setting
                         // IMPROVEMENT: If the producer is active and the last message
                         // timestamp is very close to 'now' (e.g., within 2 seconds),
                         // we treat 'now' as the true head timestamp.
                         // This eliminates the "jitter" of the last batch's arrival time.
-                        if (ts > 0 && (now - ts) < 2000) {
+
+                        if (ts > 0 && (now - ts) < config.getFreshnessThresholdMs()) {
                             ts = now;
                         }
 
