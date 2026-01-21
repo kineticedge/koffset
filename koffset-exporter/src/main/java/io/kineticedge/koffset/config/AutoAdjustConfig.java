@@ -73,7 +73,6 @@ public class AutoAdjustConfig {
                 "enabled=" + enabled +
                 ", samples=" + samples +
                 ", tolerance=" + tolerance +
-//                ", cadenceTolerance=" + cadenceTolerance +
                 ", minRefreshMs=" + minRefreshMs +
                 '}';
     }

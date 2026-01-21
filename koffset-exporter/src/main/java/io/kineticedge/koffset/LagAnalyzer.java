@@ -33,12 +33,8 @@ import java.util.stream.Collectors;
 
 public class LagAnalyzer {
 
-
     private static final Logger log = LoggerFactory.getLogger(LagAnalyzer.class);
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
-
-    private static final int VELOCITY_WINDOW_SIZE = 5; // Average over last 5 scrapes
-
 
     public record OffsetInfo(long offset, long timestamp) {
     }
@@ -94,14 +90,18 @@ public class LagAnalyzer {
         this.clock = clock;
     }
 
+    private long now() {
+        return clock.getAsLong();
+    }
+
     private long timeoutMs() {
-        return config.getAdminTimeout();
+        return config.getAdminTimeoutMs();
     }
 
     public void start() {
 
-        this.refreshedAt = clock.getAsLong();
-        this.lastIntervalMs = config.getInitialInterval();
+        this.refreshedAt = now();
+        this.lastIntervalMs = config.getInitialIntervalMs();
 
         // synchronous hydration, minimizes misinformation on restart
         try {
@@ -111,7 +111,7 @@ public class LagAnalyzer {
             log.error("failed to hydrate history on startup; data may be inaccurate until producer moves", e);
         }
 
-        schedule(config.getInitialDelay(), config.getInitialInterval());
+        schedule(config.getInitialDelayMs(), config.getInitialIntervalMs());
     }
 
     public Map<String, Map<TopicPartition, LagDetail>> lag() {
@@ -208,7 +208,7 @@ public class LagAnalyzer {
     }
 
     private void refresh() {
-        final long start = clock.getAsLong();
+        final long start = now();
 
         listGroupIds()
                 .<GroupSnapshot>thenCompose(ids -> {
@@ -252,8 +252,8 @@ public class LagAnalyzer {
 
                     groupLag.putAll(results);
 
-                    lastRefreshDurationMs = clock.getAsLong() - start;
-                    refreshedAt = clock.getAsLong();
+                    lastRefreshDurationMs = now() - start;
+                    refreshedAt = now();
 
                 })
                 .exceptionally(ex -> {
@@ -272,14 +272,14 @@ public class LagAnalyzer {
 
         return fetchLatestOffsets(allPartitions).thenApply(latestOffsets -> {
             Map<String, Map<TopicPartition, LagDetail>> results = new TreeMap<>();
-            long now = clock.getAsLong();
+            long now = now();
 
             // 1. Update Producer Timeline
             latestOffsets.forEach((tp, info) -> {
                 var history = producerHistory.computeIfAbsent(tp, k -> new ArrayDeque<>());
                 if (history.isEmpty() || history.peekLast()[0] != info.offset()) {
                     history.addLast(new long[]{info.offset(), info.timestamp()});
-                    if (history.size() > 500) history.removeFirst(); // Increased for higher resolution
+                    if (history.size() > config.getHistorySize()) history.removeFirst(); // Increased for higher resolution
                 }
             });
 
@@ -405,7 +405,7 @@ public class LagAnalyzer {
         var maxTsFuture = admin.listOffsets(maxTsRequest).all().toCompletionStage().toCompletableFuture().orTimeout(timeoutMs(), TimeUnit.MILLISECONDS);
 
         return latestFuture.thenCombine(maxTsFuture, (latestResult, maxTsResult) -> {
-            long now = clock.getAsLong();
+            long now = now();
             return partitions.stream().collect(Collectors.toMap(
                     tp -> tp,
                     tp -> {
@@ -436,40 +436,39 @@ public class LagAnalyzer {
     }
 
 
-    private long calculateInterpolatedLag(TopicPartition tp, long committedOffset, OffsetInfo latest) {
-        Deque<long[]> history = producerHistory.get(tp);
-
-        System.out.println("HISTORY " + tp + " " + history.getLast());
-        if (history == null || history.size() < 2) {
-            return 0;
-        }
-
-        long[] p1 = null;
-        long[] p2 = null;
-
-        for (long[] point : history) {
-            if (point[0] <= committedOffset) {
-                p1 = point;
-            } else {
-                p2 = point;
-                break;
-            }
-        }
-
-        if (p1 != null && p2 != null) {
-            // Linear interpolation using the Validated Timestamps from the history
-            double ratio = (p2[0] == p1[0]) ? 0 : (double) (committedOffset - p1[0]) / (p2[0] - p1[0]);
-            long estimatedTs = p1[1] + (long) (ratio * (p2[1] - p1[1]));
-
-            // CRITICAL: Compare against the specific partition's latest timestamp, NOT System.now()
-            return Math.max(0, latest.timestamp() - estimatedTs);
-        } else if (p1 != null) {
-            // If the consumer is at or past our latest known producer point
-            return Math.max(0, latest.timestamp() - p1[1]);
-        }
-
-        return 0;
-    }
+//    private long calculateInterpolatedLag(TopicPartition tp, long committedOffset, OffsetInfo latest) {
+//        Deque<long[]> history = producerHistory.get(tp);
+//
+//        if (history == null || history.size() < 2) {
+//            return 0;
+//        }
+//
+//        long[] p1 = null;
+//        long[] p2 = null;
+//
+//        for (long[] point : history) {
+//            if (point[0] <= committedOffset) {
+//                p1 = point;
+//            } else {
+//                p2 = point;
+//                break;
+//            }
+//        }
+//
+//        if (p1 != null && p2 != null) {
+//            // Linear interpolation using the Validated Timestamps from the history
+//            double ratio = (p2[0] == p1[0]) ? 0 : (double) (committedOffset - p1[0]) / (p2[0] - p1[0]);
+//            long estimatedTs = p1[1] + (long) (ratio * (p2[1] - p1[1]));
+//
+//            // CRITICAL: Compare against the specific partition's latest timestamp, NOT System.now()
+//            return Math.max(0, latest.timestamp() - estimatedTs);
+//        } else if (p1 != null) {
+//            // If the consumer is at or past our latest known producer point
+//            return Math.max(0, latest.timestamp() - p1[1]);
+//        }
+//
+//        return 0;
+//    }
 
     private CompletableFuture<List<String>> listGroupIds() {
         return admin.listGroups().all().toCompletionStage().toCompletableFuture()

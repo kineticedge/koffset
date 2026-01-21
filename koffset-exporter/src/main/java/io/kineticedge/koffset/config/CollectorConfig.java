@@ -3,18 +3,18 @@ package io.kineticedge.koffset.config;
 public class CollectorConfig {
 
     // timeout used for making the kafka admin client calls
-    private long adminTimeout = 30_000L;
+    private long adminTimeoutMs = 30_000L;
 
     // the delay before the first collection occurs
-    private long initialDelay = 2_000L;
+    private long initialDelayMs = 2_000L;
 
     // the interval used for collection, auto-adjuster (if enabled) will change this to align
     // with the primary scrape frequency.
-    private long initialInterval = 5_000L;
+    private long initialIntervalMs = 5_000L;
 
     private int velocityWindowMultiplier = 2;
 
-    private int historySize;
+    private int historySize = 500;
 
     private long freshnessThresholdMs = 200L;
 
@@ -25,38 +25,38 @@ public class CollectorConfig {
     }
 
     /* testing */
-    public CollectorConfig(long adminTimeout, long initialDelay, long initialInterval, int historySize, long freshnessThresholdMs) {
-        this.adminTimeout = adminTimeout;
-        this.initialDelay = initialDelay;
-        this.initialInterval = initialInterval;
+    public CollectorConfig(long adminTimeoutMs, long initialDelayMs, long initialIntervalMs, int historySize, long freshnessThresholdMs) {
+        this.adminTimeoutMs = adminTimeoutMs;
+        this.initialDelayMs = initialDelayMs;
+        this.initialIntervalMs = initialIntervalMs;
         this.historySize = historySize;
         this.freshnessThresholdMs = freshnessThresholdMs;
     }
 
     //
 
-    public long getAdminTimeout() {
-        return adminTimeout;
+    public long getAdminTimeoutMs() {
+        return adminTimeoutMs;
     }
 
-    public void setAdminTimeout(long adminTimeout) {
-        this.adminTimeout = adminTimeout;
+    public void setAdminTimeoutMs(long adminTimeoutMs) {
+        this.adminTimeoutMs = adminTimeoutMs;
     }
 
-    public long getInitialDelay() {
-        return initialDelay;
+    public long getInitialDelayMs() {
+        return initialDelayMs;
     }
 
-    public void setInitialDelay(long initialDelay) {
-        this.initialDelay = initialDelay;
+    public void setInitialDelayMs(long initialDelayMs) {
+        this.initialDelayMs = initialDelayMs;
     }
 
-    public long getInitialInterval() {
-        return initialInterval;
+    public long getInitialIntervalMs() {
+        return initialIntervalMs;
     }
 
-    public void setInitialInterval(long initialInterval) {
-        this.initialInterval = initialInterval;
+    public void setInitialIntervalMs(long initialIntervalMs) {
+        this.initialIntervalMs = initialIntervalMs;
     }
 
     public int getVelocityWindowMultiplier() {
@@ -88,9 +88,9 @@ public class CollectorConfig {
     @Override
     public String toString() {
         return "CollectorConfig{" +
-                "adminTimeout=" + adminTimeout +
-                ", delay=" + initialDelay +
-                ", interval=" + initialInterval +
+                "adminTimeout=" + adminTimeoutMs +
+                ", delay=" + initialDelayMs +
+                ", interval=" + initialIntervalMs +
                 ", velocityWindowMultiplier=" + velocityWindowMultiplier +
                 ", historySize=" + historySize +
                 ", freshnessThresholdMs=" + freshnessThresholdMs +
