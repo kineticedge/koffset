@@ -9,4 +9,8 @@ buildscript {
 }
 
 include("koffset-exporter")
-include("demo-data-generator")
+
+// allows for the Dockerfile build to exclude data-demo-generator
+if (File(rootDir, "demo-data-generator").exists()) {
+    include("demo-data-generator")
+}

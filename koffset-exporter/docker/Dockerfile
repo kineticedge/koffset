@@ -2,18 +2,24 @@ FROM eclipse-temurin:25-jdk-ubi10-minimal AS build
 
 RUN microdnf install -y curl tar gzip unzip && microdnf clean all
 
-ENV GRADLE_VERSION=9.2.1
-RUN curl -sL https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip -o gradle.zip \
-    && unzip gradle.zip -d /opt \
-    && ln -s /opt/gradle-${GRADLE_VERSION}/bin/gradle /usr/bin/gradle \
-    && rm gradle.zip
-
-COPY --chown=1000:1000 . /home/gradle/src
+ENV GRADLE_USER_HOME=/home/gradle/.gradle
 
 WORKDIR /home/gradle/src
 
-RUN gradle :koffset-exporter:build -x test --no-daemon
+COPY --chown=1000:1000 gradlew *.gradle.kts gradle.properties ./
+COPY --chown=1000:1000 gradle/ gradle/
+COPY --chown=1000:1000 koffset-exporter/*.gradle.kts koffset-exporter/
 
+RUN mkdir -p $GRADLE_USER_HOME && chown -R 1000:1000 /home/gradle
+
+USER 1000
+RUN ./gradlew :koffset-exporter:dependencies --no-daemon
+
+USER ROOT
+COPY --chown=1000:1000 . .
+
+USER 1000
+RUN ./gradlew :koffset-exporter:assemble --no-daemon -x test
 
 FROM eclipse-temurin:25-jre-ubi10-minimal
 
@@ -24,9 +30,8 @@ USER appuser
 
 WORKDIR /app
 
-# for production Docker build process, artifacts are pulled in from the previous build phase
-COPY --from=build --chown=appuser:appgroup /home/gradle/src/koffset-exporter/docker/entrypoint.sh /entrypoint.sh
 COPY --from=build --chown=appuser:appgroup /home/gradle/src/koffset-exporter/build/distributions/koffset-exporter-*.tar /app.tar
+COPY --from=build --chown=appuser:appgroup /home/gradle/src/koffset-exporter/docker/entrypoint.sh /entrypoint.sh
 
 EXPOSE 8080/tcp
 
