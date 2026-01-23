@@ -5,7 +5,26 @@ import io.kineticedge.koffset.util.EnvConfigLoader;
 import io.kineticedge.koffset.util.TestEnvironment;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+
 class KoffsetConfigTest {
+
+    @Test
+    void testDefaults() {
+        KoffsetConfig config = new KoffsetConfig();
+        assertNotNull(config.getAutoAdjust());
+        assertNotNull(config.getCollector());
+        assertNotNull(config.getServer());
+        assertEquals(Map.of(), config.getKafka());
+    }
+
+    @Test
+    void testGettersAndSetters() throws Exception {
+        KoffsetConfig config = new KoffsetConfig();
+        ConfigTestUtil.assertGettersAndSetters(new EnvConfigLoader(), config);
+    }
 
     @Test
     void testFromEnv() {

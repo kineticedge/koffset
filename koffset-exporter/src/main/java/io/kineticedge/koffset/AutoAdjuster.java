@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.LongSupplier;
 
 public class AutoAdjuster {
 
@@ -14,13 +15,25 @@ public class AutoAdjuster {
     private final AutoAdjustConfig config;
     private final LagAnalyzer lagAnalyzer;
 
+    private final LongSupplier clock;
+
     private final List<Long> scrapeTimestamps = new ArrayList<>();
 
     private boolean logged;
 
     public AutoAdjuster(final AutoAdjustConfig config, final LagAnalyzer lagAnalyzer) {
+        this(config, lagAnalyzer, System::currentTimeMillis);
+    }
+
+    /* for testing - use custom clock for consistent testing */
+    public AutoAdjuster(final AutoAdjustConfig config, final LagAnalyzer lagAnalyzer, LongSupplier clock) {
         this.config = config;
         this.lagAnalyzer = lagAnalyzer;
+        this.clock = clock;
+    }
+
+    private long now() {
+        return clock.getAsLong();
     }
 
     private long lastIntervalMs() {
@@ -31,7 +44,10 @@ public class AutoAdjuster {
         return lagAnalyzer.lastRefreshDurationMs();
     }
 
-    public void alignToScrape(long detectedIntervalMs) {
+    /* package scope for testing */
+    void alignToScrape(long detectedIntervalMs) {
+
+        log.debug("Detected cadence {}ms", detectedIntervalMs);
 
         if (!config.isEnabled()) {
             if (!logged) {
@@ -41,6 +57,7 @@ public class AutoAdjuster {
             return;
         }
 
+//        long targetInterval = Math.min(1, detectedIntervalMs);
         long targetInterval = detectedIntervalMs;
 
         if (detectedIntervalMs < config.getMinRefreshMs()) {
@@ -53,15 +70,26 @@ public class AutoAdjuster {
         // --- FRESHNESS TOLERANCE CHECK ---
         // We want our data to be "fresh". If the time since our last refresh (dataAge)
         // is more than the allowed tolerance percentage of the interval, we adjust.
-        long now = System.currentTimeMillis();
+        long now = now();
         long dataAge = now - lagAnalyzer.getRefreshedAt();
-        double ageRatio = (double) dataAge / targetInterval;
 
-        long safetyMargin = Math.min(500, (long) (targetInterval * 0.05));
+        // Calculate a dynamic safety margin based on the actual work.
+        // We need at least enough time to finish a refresh, plus a small cushion (10% of refresh duration).
+        // We cap this margin at 50% of the allowed tolerance to ensure we don't 'safety' ourselves into stale data.
+        long maxSafetyMargin = (long) (targetInterval * config.getTolerance() * 0.5);
+
+        // safety margin is 110% of last refresh duration, with a max safety margin set to 50% of tolerance.
+        // maxSaftyMargin is to ensure we do not add too much safety and make our data stale.
+        final long safetyMargin = Math.min((long) (lastRefreshDurationMs() * 1.10), maxSafetyMargin);
+
+        //long safetyMargin = Math.min(500, (long) (targetInterval * safetyRatio));
         long maxAge = (long) (targetInterval * config.getTolerance());
 
+        log.debug("detectedInterval={}, targetedInterval={}, dataAge={}, lastRefreshDuration={}, tolerance={}, maxSafetyMargin={}, safetyMargin={}, maxAge={}",
+                detectedIntervalMs, targetInterval, dataAge, lastRefreshDurationMs(), config.getTolerance(), maxSafetyMargin, safetyMargin, maxAge);
 
-
+        // If we are within the "Safe Zone", we don't need to reschedule.
+        // Safe Zone is: [safetyMargin ... maxAge]
         if (dataAge >= safetyMargin && dataAge <= maxAge) {
             log.debug("Data age {}ms is in Safe Zone ({}ms to {}ms). Skipping reschedule.",
                     dataAge, safetyMargin, maxAge);
@@ -73,9 +101,7 @@ public class AutoAdjuster {
         }
 
         long leadTimeMs = lastRefreshDurationMs() + safetyMargin;
-
-        long delayMillis = targetInterval - leadTimeMs;
-        if (delayMillis < 0) delayMillis = 0;
+        long delayMillis = Math.max(0, targetInterval - leadTimeMs);
 
         log.info("Aligning scheduler: detected cadence {}ms, effective period {}ms. Next refresh in {}ms",
                 detectedIntervalMs, lastIntervalMs(), delayMillis);
@@ -85,7 +111,7 @@ public class AutoAdjuster {
 
 
     public void trackScrapeCadence() {
-        long now = System.currentTimeMillis();
+        long now = now();
         synchronized (scrapeTimestamps) {
             scrapeTimestamps.add(now);
             if (scrapeTimestamps.size() > config.getSamples()) {
@@ -105,6 +131,12 @@ public class AutoAdjuster {
         }
 
         long average = intervals.stream().mapToLong(Long::longValue).sum() / intervals.size();
+
+        if (average <= 0) {
+            log.warn("Average interval is {}ms. Skipping auto-adjustment.", average);
+            return;
+        }
+
         boolean stable = intervals.stream().allMatch(interval ->
                 Math.abs(interval - average) <= (average * config.getTolerance())
         );

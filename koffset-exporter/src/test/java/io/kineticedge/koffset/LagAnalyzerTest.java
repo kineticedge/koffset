@@ -79,14 +79,15 @@ class LagAnalyzerTest extends KafkaContainerTest {
                 30_000L,
                 0L,
                 100L,
-                10
+                10,
+                -1 // do not do the freshness check, otherwise partitionLagTimestamps will not be able to be compared to
         );
 
         var analyizer = new LagAnalyzer(config, admin());
 
         analyizer.start();
 
-        Thread.sleep(1000L);
+        Thread.sleep(500L);
 
         var lag = analyizer.lag();
 
@@ -95,13 +96,19 @@ class LagAnalyzerTest extends KafkaContainerTest {
         var partitionLag = groupLag.get(new TopicPartition(topic, 0));
 
         Assertions.assertEquals(10L, partitionLag.partitionHeadOffset());
-        //Assertions.assertEquals(timestamps.get(9), partitionLag.partitionHeadTimestamp());
         Assertions.assertEquals(5L, partitionLag.groupCommittedOffset());
-        //NOT SURE IF THIS WILL ALL BE TRUE... as it is aprx
-        //Assertions.assertEquals(timestamps.get(5), partitionLag.groupOffsetInterpolatedTimestamp());
+
         Assertions.assertEquals(-1L, partitionLag.groupOffsetFirstObservedTimestamp());
         Assertions.assertEquals(5L, partitionLag.offsetLag());
         Assertions.assertEquals(0.0, partitionLag.groupVelocityRecordsPerSec());
+
+        // max Timetamp
+        Assertions.assertEquals(timestamps.get(9), partitionLag.partitionHeadTimestamp());
+
+        //
+        Assertions.assertEquals(timestamps.get(5), partitionLag.groupOffsetInterpolatedTimestamp());
+        //Assertions.assertTrue(Math.abs(timestamps.get(5) - partitionLag.groupOffsetInterpolatedTimestamp()) < 1);
+
     }
 
 }

@@ -28,16 +28,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 
 public class LagAnalyzer {
 
-
     private static final Logger log = LoggerFactory.getLogger(LagAnalyzer.class);
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
-
-    private static final int VELOCITY_WINDOW_SIZE = 5; // Average over last 5 scrapes
-
 
     public record OffsetInfo(long offset, long timestamp) {
     }
@@ -62,6 +59,7 @@ public class LagAnalyzer {
 
     private final CollectorConfig config;
     private final Admin admin;
+    private final LongSupplier clock;
 
     private final Map<String, Map<TopicPartition, LagDetail>> groupLag = new ConcurrentHashMap<>();
 
@@ -82,18 +80,28 @@ public class LagAnalyzer {
     private long refreshedAt;
 
     public LagAnalyzer(final CollectorConfig config, final Admin admin) {
+        this(config, admin, System::currentTimeMillis);
+    }
+
+    /* expose for testing */
+    public LagAnalyzer(final CollectorConfig config, final Admin admin, LongSupplier clock) {
         this.config = config;
         this.admin = admin;
+        this.clock = clock;
+    }
+
+    private long now() {
+        return clock.getAsLong();
     }
 
     private long timeoutMs() {
-        return config.getAdminTimeout();
+        return config.getAdminTimeoutMs();
     }
 
     public void start() {
 
-        this.refreshedAt = System.currentTimeMillis();
-        this.lastIntervalMs = config.getInitialInterval();
+        this.refreshedAt = now();
+        this.lastIntervalMs = config.getInitialIntervalMs();
 
         // synchronous hydration, minimizes misinformation on restart
         try {
@@ -103,7 +111,7 @@ public class LagAnalyzer {
             log.error("failed to hydrate history on startup; data may be inaccurate until producer moves", e);
         }
 
-        schedule(config.getInitialDelay(), config.getInitialInterval());
+        schedule(config.getInitialDelayMs(), config.getInitialIntervalMs());
     }
 
     public Map<String, Map<TopicPartition, LagDetail>> lag() {
@@ -200,7 +208,7 @@ public class LagAnalyzer {
     }
 
     private void refresh() {
-        final long start = System.currentTimeMillis();
+        final long start = now();
 
         listGroupIds()
                 .<GroupSnapshot>thenCompose(ids -> {
@@ -244,8 +252,8 @@ public class LagAnalyzer {
 
                     groupLag.putAll(results);
 
-                    lastRefreshDurationMs = System.currentTimeMillis() - start;
-                    refreshedAt = System.currentTimeMillis();
+                    lastRefreshDurationMs = now() - start;
+                    refreshedAt = now();
 
                 })
                 .exceptionally(ex -> {
@@ -264,14 +272,14 @@ public class LagAnalyzer {
 
         return fetchLatestOffsets(allPartitions).thenApply(latestOffsets -> {
             Map<String, Map<TopicPartition, LagDetail>> results = new TreeMap<>();
-            long now = System.currentTimeMillis();
+            long now = now();
 
             // 1. Update Producer Timeline
             latestOffsets.forEach((tp, info) -> {
                 var history = producerHistory.computeIfAbsent(tp, k -> new ArrayDeque<>());
                 if (history.isEmpty() || history.peekLast()[0] != info.offset()) {
                     history.addLast(new long[]{info.offset(), info.timestamp()});
-                    if (history.size() > 500) history.removeFirst(); // Increased for higher resolution
+                    if (history.size() > config.getHistorySize()) history.removeFirst(); // Increased for higher resolution
                 }
             });
 
@@ -397,20 +405,20 @@ public class LagAnalyzer {
         var maxTsFuture = admin.listOffsets(maxTsRequest).all().toCompletionStage().toCompletableFuture().orTimeout(timeoutMs(), TimeUnit.MILLISECONDS);
 
         return latestFuture.thenCombine(maxTsFuture, (latestResult, maxTsResult) -> {
-            long now = System.currentTimeMillis();
+            long now = now();
             return partitions.stream().collect(Collectors.toMap(
                     tp -> tp,
                     tp -> {
                         long hwm = latestResult.containsKey(tp) ? latestResult.get(tp).offset() : 0L;
                         long ts = maxTsResult.containsKey(tp) ? maxTsResult.get(tp).timestamp() : -1L;
 
-
                         // TODO 2000 a setting
                         // IMPROVEMENT: If the producer is active and the last message
                         // timestamp is very close to 'now' (e.g., within 2 seconds),
                         // we treat 'now' as the true head timestamp.
                         // This eliminates the "jitter" of the last batch's arrival time.
-                        if (ts > 0 && (now - ts) < 2000) {
+
+                        if (ts > 0 && (now - ts) < config.getFreshnessThresholdMs()) {
                             ts = now;
                         }
 
@@ -428,40 +436,39 @@ public class LagAnalyzer {
     }
 
 
-    private long calculateInterpolatedLag(TopicPartition tp, long committedOffset, OffsetInfo latest) {
-        Deque<long[]> history = producerHistory.get(tp);
-
-        System.out.println("HISTORY " + tp + " " + history.getLast());
-        if (history == null || history.size() < 2) {
-            return 0;
-        }
-
-        long[] p1 = null;
-        long[] p2 = null;
-
-        for (long[] point : history) {
-            if (point[0] <= committedOffset) {
-                p1 = point;
-            } else {
-                p2 = point;
-                break;
-            }
-        }
-
-        if (p1 != null && p2 != null) {
-            // Linear interpolation using the Validated Timestamps from the history
-            double ratio = (p2[0] == p1[0]) ? 0 : (double) (committedOffset - p1[0]) / (p2[0] - p1[0]);
-            long estimatedTs = p1[1] + (long) (ratio * (p2[1] - p1[1]));
-
-            // CRITICAL: Compare against the specific partition's latest timestamp, NOT System.now()
-            return Math.max(0, latest.timestamp() - estimatedTs);
-        } else if (p1 != null) {
-            // If the consumer is at or past our latest known producer point
-            return Math.max(0, latest.timestamp() - p1[1]);
-        }
-
-        return 0;
-    }
+//    private long calculateInterpolatedLag(TopicPartition tp, long committedOffset, OffsetInfo latest) {
+//        Deque<long[]> history = producerHistory.get(tp);
+//
+//        if (history == null || history.size() < 2) {
+//            return 0;
+//        }
+//
+//        long[] p1 = null;
+//        long[] p2 = null;
+//
+//        for (long[] point : history) {
+//            if (point[0] <= committedOffset) {
+//                p1 = point;
+//            } else {
+//                p2 = point;
+//                break;
+//            }
+//        }
+//
+//        if (p1 != null && p2 != null) {
+//            // Linear interpolation using the Validated Timestamps from the history
+//            double ratio = (p2[0] == p1[0]) ? 0 : (double) (committedOffset - p1[0]) / (p2[0] - p1[0]);
+//            long estimatedTs = p1[1] + (long) (ratio * (p2[1] - p1[1]));
+//
+//            // CRITICAL: Compare against the specific partition's latest timestamp, NOT System.now()
+//            return Math.max(0, latest.timestamp() - estimatedTs);
+//        } else if (p1 != null) {
+//            // If the consumer is at or past our latest known producer point
+//            return Math.max(0, latest.timestamp() - p1[1]);
+//        }
+//
+//        return 0;
+//    }
 
     private CompletableFuture<List<String>> listGroupIds() {
         return admin.listGroups().all().toCompletionStage().toCompletableFuture()
