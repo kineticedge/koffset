@@ -5,10 +5,10 @@ import java.util.Map;
 
 public class KoffsetConfig {
 
-    private CollectorConfig collector = new CollectorConfig();
-    private ServerConfig server = new ServerConfig();
-    private AutoAdjustConfig autoAdjust = new AutoAdjustConfig();
-    private Map<String, Object> kafka = new HashMap<>();
+    private CollectorConfig collector;
+    private ServerConfig server;
+    private AutoAdjustConfig autoAdjust;
+    private Map<String, Object> kafka;
 
     //
 

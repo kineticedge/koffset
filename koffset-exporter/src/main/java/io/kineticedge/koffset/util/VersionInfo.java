@@ -21,6 +21,7 @@ public class VersionInfo {
                 log.info("\n{}\n", banner);
             }
         } catch (Exception e) {
+            //ignore
         }
     }
     public static void log() {

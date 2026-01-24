@@ -49,6 +49,7 @@ public class Environment {
     public long getAsLong(String name, long defaultValue) {
 
         final String val = getEnv(name);
+
         if (isBlank(val)) {
             return defaultValue;
         }
