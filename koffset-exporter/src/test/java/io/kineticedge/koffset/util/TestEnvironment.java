@@ -9,14 +9,24 @@ public class TestEnvironment extends Environment {
     Map<String, String> env = new HashMap<>();
 
     @Override
-    public Map<String, String> getAll() {
-        return env;
+    protected Map<String, String> getEnv() {
+        return Map.copyOf(env);
     }
 
     @Override
-    public Optional<String> get(String key) {
-        return Optional.of(env.get(key));
+    protected String getEnv(String name) {
+        return env.get(name);
     }
+
+    //    @Override
+//    public Map<String, String> getAll() {
+//        return env;
+//    }
+//
+//    @Override
+//    public Optional<String> get(String key) {
+//        return Optional.ofNullable(env.get(key));
+//    }
 
     // testing 'hooks'
 

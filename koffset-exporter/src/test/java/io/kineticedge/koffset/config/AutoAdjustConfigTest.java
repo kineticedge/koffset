@@ -35,4 +35,11 @@ class AutoAdjustConfigTest {
         AutoAdjustConfig config = new AutoAdjustConfig();
         ConfigTestUtil.assertGettersAndSetters(new EnvConfigLoader(), config);
     }
+
+    @Test
+    void testToString() {
+        AutoAdjustConfig config = new AutoAdjustConfig(true, 10, 0.99, 123L);
+        assertTrue(config.toString().contains("minRefreshMs=123"));
+    }
+
 }

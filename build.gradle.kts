@@ -66,13 +66,19 @@ subprojects {
             file.writeText("export CP=\"\"\n$cp\n")
             file.setExecutable(true)
         }
-        val postBuildScript by tasks.registering {
+
+        val generateClasspathScript by tasks.registering {
             doLast {
                 createIntegrationClasspath("./.classpath.sh")
             }
         }
+
+        tasks.named("assemble").configure {
+            dependsOn(generateClasspathScript)
+        }
+
         tasks.named("build").configure {
-            finalizedBy(postBuildScript)
+            dependsOn(generateClasspathScript)
         }
     }
 }

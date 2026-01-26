@@ -35,17 +35,4 @@ public class PropertyConfigLoader extends ConfigLoader {
     protected char delimiter() {
         return '.';
     }
-
-    public static void main(String[] args) {
-
-        Properties p = new Properties();
-        p.put("koffset.kafka.bootstrap.servers", "a");
-        p.put("koffset.kafka.foo..bar", "a");
-        p.put("koffset.collector.admin.timeout", "555");
-
-        ConfigLoader config = new PropertyConfigLoader(p);
-        KoffsetConfig koffsetConfig = new KoffsetConfig();
-        config.populate(koffsetConfig, "koffset");
-        System.out.println(koffsetConfig);
-    }
 }

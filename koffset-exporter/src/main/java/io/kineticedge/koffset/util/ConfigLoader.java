@@ -10,7 +10,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-public abstract class ConfigLoader {
+public abstract class   ConfigLoader {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ConfigLoader.class);
 
@@ -74,8 +74,6 @@ public abstract class ConfigLoader {
     }
 
     //
-
-    private Environment env;
 
     private final Map<Class<?>, PropertySetter> handlers = Map.ofEntries(
             Map.<Class<?>, PropertySetter>entry(String.class, (m, o) -> getValue(m.sourceKey()).ifPresent(s -> m.set(o, s))),
@@ -143,12 +141,6 @@ public abstract class ConfigLoader {
     }
 
     public ConfigLoader() {
-        this.env = new Environment();
-    }
-
-    // exposed for testing
-    public ConfigLoader(Environment env) {
-        this.env = env;
     }
 
     public <T> void populate(final T object, String prefix) {
@@ -188,6 +180,7 @@ public abstract class ConfigLoader {
     }
 
     private Stream<Field> fields(Class<?> clazz, String prefix) {
+
         return Stream.of(clazz.getDeclaredMethods())
                 .filter(m -> !Modifier.isStatic(m.getModifiers()))
                 .filter(m -> Modifier.isPublic(m.getModifiers()))
@@ -223,7 +216,8 @@ public abstract class ConfigLoader {
                 try {
                     processor.set(field, object);
                 } catch (Exception e) {
-                    log.debug("Failed to process field {}", field.name());
+                    log.error("Failed to process field {}", field.name());
+                    throw new RuntimeException(e);
                 }
             }
         });
@@ -250,5 +244,6 @@ public abstract class ConfigLoader {
      * Provides all keys available in the source (used for Map scanning).
      */
     protected abstract java.util.Set<String> getAllKeys();
+
 
 }

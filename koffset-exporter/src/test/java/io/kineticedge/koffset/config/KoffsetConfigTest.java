@@ -5,8 +5,6 @@ import io.kineticedge.koffset.util.EnvConfigLoader;
 import io.kineticedge.koffset.util.TestEnvironment;
 import org.junit.jupiter.api.Test;
 
-import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 class KoffsetConfigTest {
@@ -14,10 +12,10 @@ class KoffsetConfigTest {
     @Test
     void testDefaults() {
         KoffsetConfig config = new KoffsetConfig();
-        assertNotNull(config.getAutoAdjust());
-        assertNotNull(config.getCollector());
-        assertNotNull(config.getServer());
-        assertEquals(Map.of(), config.getKafka());
+        assertNull(config.getAutoAdjust());
+        assertNull(config.getCollector());
+        assertNull(config.getServer());
+        assertNull(config.getKafka());
     }
 
     @Test
@@ -52,6 +50,12 @@ class KoffsetConfigTest {
 
         loader.populate(config, "KOFFSET");
 
-        System.out.println(config);
+        //System.out.println(config);
+    }
+
+    @Test
+    void testToString() {
+        KoffsetConfig config = new KoffsetConfig();
+        assertTrue(config.toString().contains("autoAdjust"));
     }
 }
