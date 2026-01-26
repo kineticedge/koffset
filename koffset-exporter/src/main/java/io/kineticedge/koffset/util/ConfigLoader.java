@@ -180,6 +180,7 @@ public abstract class   ConfigLoader {
     }
 
     private Stream<Field> fields(Class<?> clazz, String prefix) {
+
         return Stream.of(clazz.getDeclaredMethods())
                 .filter(m -> !Modifier.isStatic(m.getModifiers()))
                 .filter(m -> Modifier.isPublic(m.getModifiers()))

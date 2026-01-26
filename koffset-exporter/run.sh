@@ -2,7 +2,7 @@
 set -e
 
 cd "$(dirname "$0")"
-gradle assemble > /dev/null
+../gradlew assemble > /dev/null
 
 . ./.classpath.sh
 

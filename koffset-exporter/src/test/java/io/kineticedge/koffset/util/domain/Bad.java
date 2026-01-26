@@ -8,7 +8,6 @@ public class Bad {
     private String badSet;
     private String nonPublicGetter;
     private String nonPublicSetter;
-
     private Map<String, String> badMap;
 
     public String missingSetter() {

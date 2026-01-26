@@ -52,4 +52,10 @@ class KoffsetConfigTest {
 
         //System.out.println(config);
     }
+
+    @Test
+    void testToString() {
+        KoffsetConfig config = new KoffsetConfig();
+        assertTrue(config.toString().contains("autoAdjust"));
+    }
 }

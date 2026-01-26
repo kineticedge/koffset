@@ -26,4 +26,10 @@ class ServerConfigTest {
         ConfigTestUtil.assertGettersAndSetters(new EnvConfigLoader(), config);
     }
 
+    @Test
+    void testToString() {
+        ServerConfig config = new ServerConfig(1234);
+        assertTrue(config.toString().contains("port=1234"));
+    }
+
 }

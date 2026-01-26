@@ -33,4 +33,10 @@ class CollectorConfigTest {
         CollectorConfig config = new CollectorConfig();
         ConfigTestUtil.assertGettersAndSetters(new EnvConfigLoader(), config);
     }
+
+    @Test
+    void testToString() {
+        CollectorConfig config = new CollectorConfig(123L, 789L, 101112, 456, 200L);
+        assertTrue(config.toString().contains("freshnessThresholdMs=200"));
+    }
 }
