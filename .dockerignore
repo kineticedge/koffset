@@ -1,0 +1,12 @@
+.git
+.gradle
+.idea
+
+build/
+data-demo-generator/
+#**/build/*
+#!**/build/distributions/*.tar
+
+# Ignore everything in build EXCEPT the distributions needed for dev
+build/*
+!build/distributions/

@@ -1,0 +1,54 @@
+
+FROM ghcr.io/graalvm/native-image-community:25 as builder
+
+#
+#TODO - move the build into Dockerfile, instead of pulling form host machine
+#
+
+COPY ./koffset-exporter/src/main/resources/META-INF/native-image /app/config
+COPY ./koffset-exporter/build/distributions/koffset-exporter-1.0.tar ./koffset-exporter-1.0.tar
+
+RUN tar xfv ./koffset-exporter-1.0.tar
+
+RUN pwd && ls -al
+
+RUN CLASSPATH=$(echo koffset-exporter-1.0/lib/*.jar | tr ' ' ':') &&  \
+  native-image \
+  -cp ${CLASSPATH} io.kineticedge.koffset.Main -o ./koffset \
+  --no-fallback \
+  --enable-http \
+  --enable-https \
+  --allow-incomplete-classpath \
+  --report-unsupported-elements-at-runtime \
+  --install-exit-handlers \
+  --enable-monitoring=jmxserver,jmxclient,heapdump,jvmstat \
+  -H:+ReportExceptionStackTraces \
+  -H:+EnableAllSecurityServices \
+  -H:EnableURLProtocols=http,https \
+  -H:AdditionalSecurityProviders=sun.security.jgss.SunProvider \
+  -H:ReflectionConfigurationFiles=/app/config/reflect-config.json \
+  -H:JNIConfigurationFiles=/app/config/jni-config.json \
+  -H:ResourceConfigurationFiles=/app/config/resource-config.json \
+  -H:SerializationConfigurationFiles=/app/config/serialization-config.json \
+  -H:PredefinedClassesConfigurationFiles=/app/config/predefined-classes-config.json \
+  -H:DynamicProxyConfigurationFiles=/app/config/proxy-config.json \
+  -march=compatibility \
+  --initialize-at-build-time=org.slf4j.LoggerFactory,org.slf4j.helpers,ch.qos.logback,ch.qos.logback.classic.Logger,org.xml.sax.helpers \
+  --verbose
+
+
+#FROM gcr.io/distroless/base-debian12
+
+FROM debian:12-slim AS runner
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    zlib1g && \
+    rm -rf /var/lib/apt/lists/* \
+
+USER 1001
+
+COPY --from=builder /app/koffset /app/
+
+WORKDIR /app
+ENTRYPOINT ["/app/koffset"]
+EXPOSE 8899
