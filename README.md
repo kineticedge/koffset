@@ -75,8 +75,12 @@ export KOFFSET_KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 ./run.sh
 ```
 
+No prebuilt image is published. Build one locally with Docker (buildx) using the scripts in the repository root:
+
 ```bash
-docker pull ghcr.io/kineticedge/koffset-exporter:main
+./build-docker.sh         # multi-stage build from koffset-exporter/docker/Dockerfile; tags koffset-exporter:latest
+./build-docker-dev.sh     # ./gradlew :koffset-exporter:build -x test, then koffset-exporter/docker/Dockerfile.dev; tags koffset-exporter-dev:latest (the image demo/docker-compose.yml uses)
+./build-docker-native.sh  # GraalVM native image from koffset-exporter/docker/Dockerfile.native; tags koffset-exporter-native:latest
 ```
 
 use the `./build-docker-*` creates to create a container locally. 
